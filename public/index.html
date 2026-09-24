@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BluePulse</title>
+<link rel="stylesheet" href="/css/style.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>BluePulse</h1>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="resumen">Resumen</button>
+      <button class="tab-btn" data-tab="wellness">Bienestar</button>
+      <button class="tab-btn" data-tab="garmin">Garmin</button>
+      <button class="tab-btn" data-tab="partidos">Partidos</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="tab-resumen" class="tab-panel active">
+      <h2>Resumen general</h2>
+      <div class="cards" id="resumen-cards">
+        <div class="card"><span class="card-label">Batería corporal (hoy)</span><span class="card-value" id="rc-battery">—</span></div>
+        <div class="card"><span class="card-label">Sueño (última noche)</span><span class="card-value" id="rc-sleep">—</span></div>
+        <div class="card"><span class="card-label">Partidos temporada 26-27</span><span class="card-value" id="rc-partidos">—</span></div>
+        <div class="card"><span class="card-label">Goles encajados</span><span class="card-value" id="rc-goles">—</span></div>
+      </div>
+      <p class="hint">Este resumen se irá completando a medida que conectemos Garmin y el dispositivo BluePulse.</p>
+    </section>
+
+    <section id="tab-wellness" class="tab-panel">
+      <h2>Bienestar — sueño, batería corporal, calorías</h2>
+      <div class="filters">
+        <label>Últimos días: <input type="number" id="wellness-days" value="30" min="7" max="180" /></label>
+        <button id="wellness-reload">Actualizar</button>
+      </div>
+      <canvas id="chart-battery" height="90"></canvas>
+      <canvas id="chart-sleep" height="90"></canvas>
+      <div id="wellness-empty" class="empty-state" style="display:none;">
+        Todavía no hay datos sincronizados de Garmin. En cuanto corra el script de extracción (GitHub Action diaria), esta sección se rellenará sola.
+      </div>
+    </section>
+
+    <section id="tab-garmin" class="tab-panel">
+      <h2>Actividades Garmin</h2>
+      <div class="filters">
+        <label>Tipo:
+          <select id="garmin-tipo">
+            <option value="todos">Todos</option>
+            <option value="running">Running</option>
+            <option value="fuerza">Fuerza</option>
+          </select>
+        </label>
+        <button id="garmin-reload">Actualizar</button>
+      </div>
+      <table class="data-table" id="garmin-table">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Duración</th><th>Distancia</th><th>FC media</th><th>Calorías</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div id="garmin-empty" class="empty-state" style="display:none;">
+        Aún no hay actividades sincronizadas.
+      </div>
+    </section>
+
+    <section id="tab-partidos" class="tab-panel">
+      <h2>Partidos — goles y estadísticas</h2>
+      <div class="filters">
+        <label>Temporada:
+          <select id="partidos-temporada">
+            <option value="26-27">26-27 (en curso)</option>
+            <option value="25-26">25-26 (estimada)</option>
+          </select>
+        </label>
+        <button id="partidos-reload">Actualizar</button>
+        <button id="partidos-nuevo-btn">+ Añadir partido</button>
+      </div>
+
+      <div class="cards" id="partidos-cards">
+        <div class="card"><span class="card-label">Partidos</span><span class="card-value" id="pc-num">—</span></div>
+        <div class="card"><span class="card-label">Minutos jugados</span><span class="card-value" id="pc-min">—</span></div>
+        <div class="card"><span class="card-label">Goles encajados</span><span class="card-value" id="pc-goles">—</span></div>
+        <div class="card"><span class="card-label">Goles/60min</span><span class="card-value" id="pc-ratio">—</span></div>
+      </div>
+
+      <canvas id="chart-tipos-gol" height="100"></canvas>
+
+      <table class="data-table" id="partidos-table">
+        <thead><tr><th>Comp.</th><th>Rival</th><th>Min</th><th>Goles</th><th>Tipos</th><th>Estimado</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <!-- Modal: nuevo partido -->
+  <dialog id="modal-login">
+    <form id="form-login">
+      <h3>Contraseña</h3>
+      <input type="password" id="login-password" placeholder="Contraseña" required />
+      <div class="modal-actions">
+        <button type="button" id="login-cancel">Cancelar</button>
+        <button type="submit">Entrar</button>
+      </div>
+      <p class="error" id="login-error"></p>
+    </form>
+  </dialog>
+
+  <dialog id="modal-partido">
+    <form id="form-partido">
+      <h3>Nuevo partido</h3>
+      <label>Competición
+        <select name="competicion">
+          <option value="liga">Liga</option>
+          <option value="copa_del_rey">Copa del Rey</option>
+          <option value="supercopa">Supercopa</option>
+          <option value="playoff">Playoff</option>
+        </select>
+      </label>
+      <label>Jornada (opcional) <input type="number" name="jornada" /></label>
+      <label>Rival <input type="text" name="rival" required /></label>
+      <label>Minutos jugados <input type="number" name="minutos_jugados" required /></label>
+      <label>Goles encajados <input type="number" name="goles_encajados" min="0" value="0" required /></label>
+      <div id="goles-detalle-container"></div>
+      <button type="button" id="add-gol-btn">+ Añadir detalle de gol</button>
+      <div class="modal-actions">
+        <button type="button" id="partido-cancel">Cancelar</button>
+        <button type="submit">Guardar</button>
+      </div>
+      <p class="error" id="partido-error"></p>
+    </form>
+  </dialog>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
