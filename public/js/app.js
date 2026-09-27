@@ -105,13 +105,37 @@ async function loadWellness() {
 document.getElementById("wellness-reload").addEventListener("click", loadWellness);
 
 // ---------- Garmin actividades ----------
-const ACT_TIPO_LABELS = {
+// Etiquetas "bonitas" para los tipos de actividad de Garmin que conocemos;
+// cualquier tipo nuevo que no esté aquí se formatea automáticamente
+// (p. ej. "indoor_cycling" -> "Indoor cycling") en vez de agruparse en "Otro".
+const GARMIN_TIPO_LABELS = {
   running: "Running",
-  fuerza: "Entreno de fuerza",
-  otro: "Actividad",
+  trail_running: "Trail running",
+  treadmill_running: "Running (cinta)",
+  strength_training: "Entreno de fuerza",
+  hiit: "HIIT",
+  cycling: "Ciclismo",
+  indoor_cycling: "Ciclismo indoor",
+  walking: "Andar",
+  swimming: "Natación",
+  lap_swimming: "Natación (piscina)",
+  yoga: "Yoga",
 };
+
+/** Clave con la que se agrupa/filtra una actividad: el tipo específico de
+ *  Garmin si lo tenemos, o si no la categoría genérica que ya calculó el script. */
+function claveTipo(act) {
+  return act.tipo_garmin || act.tipo || "otro";
+}
+
+function formatTipoGarmin(key) {
+  if (GARMIN_TIPO_LABELS[key]) return GARMIN_TIPO_LABELS[key];
+  if (!key) return "Otro";
+  return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function actTipoLabel(act) {
-  return ACT_TIPO_LABELS[act.tipo] || act.tipo_garmin || "Actividad";
+  return formatTipoGarmin(claveTipo(act));
 }
 
 /** Extrae de forma defensiva las series de ejercicios (peso/reps) si Garmin las trae.
@@ -170,19 +194,45 @@ function renderActivityDetail(act) {
             .join("")}
         </tbody>
       </table>`;
-  } else if (act.tipo === "fuerza") {
+  } else if (claveTipo(act) === "strength_training" || act.tipo === "fuerza") {
     ejerciciosHtml = `<p class="hint">No hay detalle de series/repeticiones para este entreno.</p>`;
   }
 
   return `<div class="activity-stats-grid">${statsHtml}</div>${ejerciciosHtml}`;
 }
 
+let garminActividadesCache = [];
+
+/** Reconstruye las opciones del desplegable "Tipo" a partir de los tipos
+ *  que realmente hay en los datos cargados, en vez de una lista fija. */
+function actualizarSelectorTipoGarmin() {
+  const select = document.getElementById("garmin-tipo");
+  const valorPrevio = select.value;
+  const tipos = Array.from(new Set(garminActividadesCache.map(claveTipo))).sort((a, b) =>
+    formatTipoGarmin(a).localeCompare(formatTipoGarmin(b))
+  );
+  select.innerHTML =
+    '<option value="todos">Todos</option>' +
+    tipos.map((t) => `<option value="${t}">${formatTipoGarmin(t)}</option>`).join("");
+  if (valorPrevio === "todos" || tipos.includes(valorPrevio)) select.value = valorPrevio;
+}
+
+// Trae todas las actividades del servidor (el filtrado por tipo se hace en el
+// cliente, así el desplegable puede construirse con los tipos reales).
 async function loadGarmin() {
+  const data = await apiGet(`/api/garmin?tipo=todos&limit=60`);
+  garminActividadesCache = data.activities || [];
+  actualizarSelectorTipoGarmin();
+  renderGarminList();
+}
+
+function renderGarminList() {
   const tipo = document.getElementById("garmin-tipo").value;
-  const data = await apiGet(`/api/garmin?tipo=${tipo}&limit=30`);
+  const activities =
+    tipo === "todos" ? garminActividadesCache : garminActividadesCache.filter((a) => claveTipo(a) === tipo);
+
   const list = document.getElementById("garmin-list");
   list.innerHTML = "";
-  const activities = data.activities || [];
   document.getElementById("garmin-empty").style.display = activities.length ? "none" : "block";
 
   for (const act of activities) {
@@ -215,7 +265,7 @@ async function loadGarmin() {
 }
 
 document.getElementById("garmin-reload").addEventListener("click", loadGarmin);
-document.getElementById("garmin-tipo").addEventListener("change", loadGarmin);
+document.getElementById("garmin-tipo").addEventListener("change", renderGarminList);
 
 async function lanzarSyncGarmin() {
   const btn = document.getElementById("garmin-sync-btn");
