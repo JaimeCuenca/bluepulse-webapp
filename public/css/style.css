@@ -64,6 +64,63 @@ body {
   font-family: var(--font-body);
 }
 
+/* ---------- Pantalla de carga (splash) ---------- */
+#splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg-main);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  transition: opacity 400ms ease, visibility 400ms ease;
+}
+#splash-screen.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+
+.splash-logo {
+  width: 96px;
+  height: 96px;
+  border-radius: 20px;
+  animation: splashPop 700ms cubic-bezier(0.16, 1, 0.3, 1) both, iconPulse 2000ms ease-in-out 700ms infinite;
+}
+@keyframes splashPop {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.splash-brand { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.splash-name {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 28px;
+  color: var(--accent-white);
+  letter-spacing: 0.5px;
+}
+.splash-sub {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent-blue);
+}
+
+.splash-ecg { width: 220px; height: 44px; margin-top: var(--space-sm); }
+.splash-ecg path {
+  stroke-dasharray: 360;
+  stroke-dashoffset: 360;
+  animation: ecgDraw 1800ms ease-in-out infinite;
+}
+@keyframes ecgDraw {
+  0% { stroke-dashoffset: 360; opacity: 0.3; }
+  8% { opacity: 1; }
+  55% { stroke-dashoffset: 0; opacity: 1; }
+  70% { opacity: 0.3; }
+  100% { stroke-dashoffset: -360; opacity: 0.3; }
+}
+
 /* ---------- Header / marca ---------- */
 .topbar {
   display: flex;
