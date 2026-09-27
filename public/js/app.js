@@ -94,6 +94,28 @@ function tipoColor(tipo) {
 const COMPETICION_ORDEN = { liga: 0, copa_del_rey: 1, supercopa: 2, playoff: 3 };
 const TODAS_TEMPORADAS = ["26-27", "25-26", "24-25", "23-24", "22-23"];
 
+/** Anima igual que animateValue pero mostrando "Xh Ym" en vez de horas decimales
+ *  (8.8h no es intuitivo; 8h 48m sí). */
+function animateSleep(elId, horasDecimal) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.classList.remove("skeleton");
+  if (horasDecimal == null || Number.isNaN(horasDecimal)) {
+    el.textContent = "—";
+    return;
+  }
+  const totalMin = Math.round(horasDecimal * 60);
+  const startTime = performance.now();
+  const duration = 600;
+  function step(now) {
+    const progress = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    el.textContent = fmtMinSec(Math.round(totalMin * eased));
+    if (progress < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
 // ---------- Resumen ----------
 async function loadResumen() {
   const wellness = await apiGet("/api/wellness?days=1").catch(() => null);
@@ -101,12 +123,214 @@ async function loadResumen() {
     ? wellness.snapshots[wellness.snapshots.length - 1]
     : {};
   animateValue("rc-battery", last.bateria_corporal, { suffix: "%" });
-  animateValue("rc-sleep", last.sueno_horas, { suffix: " h", decimals: 2 });
+  animateSleep("rc-sleep", last.sueno_horas);
+  animateValue("rc-kcal-total", last.kcal_totales, { suffix: " kcal" });
+  const kcalActivasEl = document.getElementById("rc-kcal-activas");
+  const kcalPasivasEl = document.getElementById("rc-kcal-pasivas");
+  kcalActivasEl.textContent = last.kcal_activas != null ? Math.round(last.kcal_activas) + " kcal" : "—";
+  kcalPasivasEl.textContent = last.kcal_pasivas != null ? Math.round(last.kcal_pasivas) + " kcal" : "—";
+
+  // Pista de cuándo se sincronizó Garmin de verdad por última vez: si el
+  // "Body Battery" u otro dato no cuadra con lo que marca el reloj, suele ser
+  // porque Garmin Connect (la nube) todavía no ha recibido ese dato del
+  // teléfono, no porque BluePulse esté leyendo algo viejo.
+  const syncHint = document.getElementById("rc-sync-hint");
+  if (wellness && wellness.last_sync && wellness.last_sync.sincronizado_en) {
+    const fecha = new Date(wellness.last_sync.sincronizado_en + "Z");
+    syncHint.textContent = `Última sincronización con Garmin: ${fecha.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}. Si un dato no coincide con el reloj, suele ser porque Garmin Connect (la nube) aún no lo ha recibido del teléfono — abre la app de Garmin Connect para forzar el envío y vuelve a sincronizar aquí.`;
+  } else {
+    syncHint.textContent = "";
+  }
+
   const partidos = await apiGet("/api/partidos?temporada=26-27").catch(() => null);
   if (partidos && partidos.partidos) {
     animateValue("rc-partidos", partidos.partidos.length);
     const goles = partidos.partidos.reduce((s, p) => s + (p.goles_encajados || 0), 0);
     animateValue("rc-goles", goles);
+  }
+
+  const garminData = await apiGet("/api/garmin?tipo=todos&limit=30").catch(() => null);
+  const actividadesRecientes = (garminData && garminData.activities) || [];
+  renderCargaMuscular(actividadesRecientes);
+  renderUltimoEntreno(actividadesRecientes);
+}
+
+// ---------- Carga muscular (Resumen) ----------
+// Mapa best-effort de categorías de ejercicio de Garmin -> grupos musculares.
+// Las categorías exactas que devuelve Garmin pueden variar; cualquier
+// categoría que no reconozcamos simplemente no se cuenta (no rompe nada).
+const EJERCICIO_A_GRUPOS = {
+  BENCH_PRESS: ["pecho", "hombros", "triceps"],
+  CHEST_PRESS: ["pecho", "hombros", "triceps"],
+  FLYE: ["pecho"],
+  PEC_FLY: ["pecho"],
+  PUSH_UP: ["pecho", "triceps", "hombros"],
+  SHOULDER_PRESS: ["hombros", "triceps"],
+  LATERAL_RAISE: ["hombros"],
+  FRONT_RAISE: ["hombros"],
+  REAR_DELT: ["hombros", "espalda"],
+  LAT_PULLDOWN: ["espalda", "biceps"],
+  ROW: ["espalda", "biceps"],
+  SEATED_ROW: ["espalda", "biceps"],
+  PULL_UP: ["espalda", "biceps"],
+  CHIN_UP: ["espalda", "biceps"],
+  DEADLIFT: ["espalda", "piernas", "gluteos"],
+  CURL: ["biceps"],
+  BICEP_CURL: ["biceps"],
+  HAMMER_CURL: ["biceps"],
+  TRICEPS_EXTENSION: ["triceps"],
+  TRICEP_EXTENSION: ["triceps"],
+  DIP: ["triceps", "pecho"],
+  SQUAT: ["piernas", "gluteos"],
+  LUNGE: ["piernas", "gluteos"],
+  LEG_PRESS: ["piernas"],
+  LEG_CURL: ["piernas"],
+  LEG_EXTENSION: ["piernas"],
+  CALF_RAISE: ["piernas"],
+  HIP_THRUST: ["gluteos", "piernas"],
+  GLUTE_BRIDGE: ["gluteos"],
+  PLANK: ["core"],
+  SIT_UP: ["core"],
+  CRUNCH: ["core"],
+  CORE: ["core"],
+  RUSSIAN_TWIST: ["core"],
+};
+
+// Para actividades cardio/otras (sin detalle de ejercicios), grupos que
+// razonablemente quedan cargados según el tipo de actividad completo.
+const CARDIO_A_GRUPOS = {
+  running: ["piernas"],
+  trail_running: ["piernas"],
+  treadmill_running: ["piernas"],
+  walking: ["piernas"],
+  cycling: ["piernas", "gluteos"],
+  indoor_cycling: ["piernas", "gluteos"],
+  swimming: ["espalda", "hombros", "piernas"],
+  lap_swimming: ["espalda", "hombros", "piernas"],
+  hiit: ["piernas", "core", "pecho"],
+  yoga: ["core"],
+};
+
+const GRUPO_LABELS = {
+  pecho: "Pecho",
+  espalda: "Espalda",
+  hombros: "Hombros",
+  biceps: "Bíceps",
+  triceps: "Tríceps",
+  piernas: "Piernas",
+  gluteos: "Glúteos",
+  core: "Core / Abdomen",
+  cuerpo_completo: "Cuerpo completo",
+};
+const GRUPO_ORDEN = ["pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "gluteos", "core", "cuerpo_completo"];
+
+// A partir de cuántos días sin repetir ese grupo se considera que ya no hay
+// carga/fatiga residual y deja de mostrarse.
+const DIAS_DECAIMIENTO_CARGA = 3;
+
+function extraerCategoriasEjercicio(act) {
+  const raw = act.ejercicios_raw;
+  if (!raw) return [];
+  const sets = raw.exerciseSets || raw.exercise_sets || [];
+  if (!Array.isArray(sets)) return [];
+  const categorias = new Set();
+  for (const s of sets) {
+    if ((s.setType || s.set_type || "ACTIVE") === "REST") continue;
+    const ex = (s.exercises && s.exercises[0]) || {};
+    const cat = (ex.category || s.category || "").toUpperCase();
+    if (cat) categorias.add(cat);
+  }
+  return Array.from(categorias);
+}
+
+/** Devuelve los grupos musculares que carga una actividad: por ejercicio
+ *  concreto si es fuerza y tenemos el detalle, o por tipo de actividad si es
+ *  cardio (o fuerza sin detalle de series). */
+function gruposDeActividad(act) {
+  const clave = claveTipo(act);
+  if (clave === "strength_training" || act.tipo === "fuerza") {
+    const categorias = extraerCategoriasEjercicio(act);
+    const grupos = new Set();
+    for (const c of categorias) {
+      (EJERCICIO_A_GRUPOS[c] || []).forEach((g) => grupos.add(g));
+    }
+    return grupos.size ? Array.from(grupos) : ["cuerpo_completo"];
+  }
+  return CARDIO_A_GRUPOS[clave] || [];
+}
+
+function diasDesde(fechaStr) {
+  const fecha = new Date(fechaStr + "T00:00:00");
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  return Math.round((hoy - fecha) / 86400000);
+}
+
+function textoDias(dias) {
+  if (dias <= 0) return "hoy";
+  if (dias === 1) return "ayer";
+  return `hace ${dias} días`;
+}
+
+function colorPorDias(dias) {
+  if (dias <= 1) return "carga-alta";
+  if (dias === 2) return "carga-media";
+  return "carga-baja";
+}
+
+function renderCargaMuscular(actividades) {
+  const grid = document.getElementById("muscular-grid");
+  const empty = document.getElementById("muscular-empty");
+
+  // Por cada grupo muscular, nos quedamos con la actividad MÁS RECIENTE que
+  // lo trabajó (si hay varias, la de menos días manda).
+  const cargaPorGrupo = {};
+  for (const act of actividades) {
+    if (!act.fecha) continue;
+    const dias = diasDesde(act.fecha);
+    if (dias > DIAS_DECAIMIENTO_CARGA || dias < 0) continue;
+    for (const g of gruposDeActividad(act)) {
+      if (!cargaPorGrupo[g] || dias < cargaPorGrupo[g].dias) {
+        cargaPorGrupo[g] = { dias, act };
+      }
+    }
+  }
+
+  const grupos = GRUPO_ORDEN.filter((g) => cargaPorGrupo[g]);
+  grid.innerHTML = "";
+  empty.style.display = grupos.length ? "none" : "block";
+  for (const g of grupos) {
+    const { dias, act } = cargaPorGrupo[g];
+    const chip = document.createElement("div");
+    chip.className = `muscular-chip ${colorPorDias(dias)}`;
+    chip.innerHTML = `
+      <span class="muscular-grupo">${GRUPO_LABELS[g] || g}</span>
+      <span class="muscular-dias">${textoDias(dias)}</span>
+      <span class="muscular-origen">${actTipoLabel(act)}</span>
+    `;
+    grid.appendChild(chip);
+  }
+}
+
+function renderUltimoEntreno(actividades) {
+  const list = document.getElementById("ultimo-entreno-list");
+  const empty = document.getElementById("ultimo-entreno-empty");
+  list.innerHTML = "";
+
+  if (!actividades.length) {
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+
+  // El servidor ya devuelve las actividades ordenadas de más a menos
+  // reciente, así que la fecha del primer elemento es "la última vez que
+  // entrené". Mostramos TODAS las actividades de ese mismo día (si hubo
+  // varias), no solo una.
+  const fechaMasReciente = actividades[0].fecha;
+  const delDia = actividades.filter((a) => a.fecha === fechaMasReciente);
+  for (const act of delDia) {
+    list.appendChild(crearActivityItem(act));
   }
 }
 
@@ -244,6 +468,37 @@ function renderActivityDetail(act) {
   return `<div class="activity-stats-grid">${statsHtml}</div>${ejerciciosHtml}`;
 }
 
+/** Construye el elemento <div class="activity-item"> plegable/desplegable
+ *  usado tanto en la pestaña Garmin como en la tarjeta "Último entreno" del
+ *  Resumen, para no duplicar el mismo markup en dos sitios. */
+function crearActivityItem(act) {
+  const item = document.createElement("div");
+  item.className = "activity-item";
+  item.innerHTML = `
+    <div class="activity-summary">
+      <div class="activity-summary-main">
+        <span class="activity-tipo">${actTipoLabel(act)}</span>
+        <span class="activity-fecha">${act.fecha ?? "—"}</span>
+      </div>
+      <div class="activity-summary-right">
+        <span>${fmtMinSec(act.duracion_min)}</span>
+        <span class="activity-chevron">▶</span>
+      </div>
+    </div>
+    <div class="activity-detail"></div>
+  `;
+  const detail = item.querySelector(".activity-detail");
+  const summary = item.querySelector(".activity-summary");
+  summary.addEventListener("click", () => {
+    const abierto = item.classList.toggle("open");
+    if (abierto && !detail.dataset.loaded) {
+      detail.innerHTML = renderActivityDetail(act);
+      detail.dataset.loaded = "1";
+    }
+  });
+  return item;
+}
+
 let garminActividadesCache = [];
 
 /** Reconstruye las opciones del desplegable "Tipo" a partir de los tipos
@@ -279,31 +534,7 @@ function renderGarminList() {
   document.getElementById("garmin-empty").style.display = activities.length ? "none" : "block";
 
   for (const act of activities) {
-    const item = document.createElement("div");
-    item.className = "activity-item";
-    item.innerHTML = `
-      <div class="activity-summary">
-        <div class="activity-summary-main">
-          <span class="activity-tipo">${actTipoLabel(act)}</span>
-          <span class="activity-fecha">${act.fecha ?? "—"}</span>
-        </div>
-        <div class="activity-summary-right">
-          <span>${fmtMinSec(act.duracion_min)}</span>
-          <span class="activity-chevron">▶</span>
-        </div>
-      </div>
-      <div class="activity-detail"></div>
-    `;
-    const detail = item.querySelector(".activity-detail");
-    const summary = item.querySelector(".activity-summary");
-    summary.addEventListener("click", () => {
-      const abierto = item.classList.toggle("open");
-      if (abierto && !detail.dataset.loaded) {
-        detail.innerHTML = renderActivityDetail(act);
-        detail.dataset.loaded = "1";
-      }
-    });
-    list.appendChild(item);
+    list.appendChild(crearActivityItem(act));
   }
 }
 

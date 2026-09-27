@@ -516,3 +516,70 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
 
   main { padding-bottom: 84px; }
 }
+
+/* ---------- Resumen: subtítulos de sección, calorías, carga muscular ---------- */
+.resumen-subtitulo {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  margin: var(--space-lg) 0 var(--space-sm);
+}
+
+.card-subvalues {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: 2px;
+}
+.card-subvalue {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.card-subvalue strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.muscular-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.muscular-chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--border-color);
+  border-radius: var(--radius-card);
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.muscular-chip .muscular-grupo {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+.muscular-chip .muscular-dias {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+}
+.muscular-chip .muscular-origen {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.muscular-chip.carga-alta { border-left-color: var(--goal-error); }
+.muscular-chip.carga-alta .muscular-dias { color: var(--goal-error); }
+
+.muscular-chip.carga-media { border-left-color: var(--goal-doubtful); }
+.muscular-chip.carga-media .muscular-dias { color: var(--goal-doubtful); }
+
+.muscular-chip.carga-baja { border-left-color: var(--goal-no-chance); }
+.muscular-chip.carga-baja .muscular-dias { color: var(--goal-no-chance); }

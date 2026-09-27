@@ -67,8 +67,24 @@
         <div class="card"><span class="card-label">Sueño (última noche)</span><span class="card-value" id="rc-sleep"><span class="skeleton"></span></span></div>
         <div class="card"><span class="card-label">Partidos temporada 26-27</span><span class="card-value" id="rc-partidos"><span class="skeleton"></span></span></div>
         <div class="card"><span class="card-label">Goles encajados</span><span class="card-value" id="rc-goles"><span class="skeleton"></span></span></div>
+        <div class="card card-kcal">
+          <span class="card-label">Calorías (hoy)</span>
+          <span class="card-value" id="rc-kcal-total"><span class="skeleton"></span></span>
+          <div class="card-subvalues">
+            <span class="card-subvalue">Activas <strong id="rc-kcal-activas">—</strong></span>
+            <span class="card-subvalue">Pasivas <strong id="rc-kcal-pasivas">—</strong></span>
+          </div>
+        </div>
       </div>
-      <p class="hint">Este resumen se irá completando a medida que conectemos Garmin y el dispositivo BluePulse.</p>
+      <p class="hint" id="rc-sync-hint"></p>
+
+      <h3 class="resumen-subtitulo">Carga muscular</h3>
+      <div id="muscular-grid" class="muscular-grid"></div>
+      <p class="hint" id="muscular-empty" style="display:none;">Sin entrenos en los últimos días que dejen carga muscular.</p>
+
+      <h3 class="resumen-subtitulo">Último entreno</h3>
+      <div id="ultimo-entreno-list" class="activity-list"></div>
+      <p class="hint" id="ultimo-entreno-empty" style="display:none;">Todavía no hay actividades sincronizadas.</p>
     </section>
 
     <section id="tab-wellness" class="tab-panel">
