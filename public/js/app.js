@@ -279,8 +279,8 @@ function colorPorDias(dias) {
 }
 
 function renderCargaMuscular(actividades) {
-  const grid = document.getElementById("muscular-grid");
   const empty = document.getElementById("muscular-empty");
+  const leyenda = document.getElementById("muscular-leyenda");
 
   // Por cada grupo muscular, nos quedamos con la actividad MÁS RECIENTE que
   // lo trabajó (si hay varias, la de menos días manda).
@@ -296,19 +296,37 @@ function renderCargaMuscular(actividades) {
     }
   }
 
+  // Pinta el diagrama: por defecto todas las regiones en gris ("frescas"),
+  // y las que tengan carga en rojo (hoy/ayer) o ámbar (hace 2-3 días).
+  // "cuerpo_completo" (fuerza sin detalle de series) tiñe TODAS las regiones.
+  const todasLasRegiones = document.querySelectorAll(".muscle-region");
+  todasLasRegiones.forEach((el) => {
+    el.classList.remove("carga-alta", "carga-media", "carga-fresco");
+    el.classList.add("carga-fresco");
+  });
+
   const grupos = GRUPO_ORDEN.filter((g) => cargaPorGrupo[g]);
-  grid.innerHTML = "";
+  for (const g of grupos) {
+    const { dias } = cargaPorGrupo[g];
+    const color = colorPorDias(dias); // "carga-alta" | "carga-media" | "carga-baja"
+    const claseColor = color === "carga-baja" ? "carga-media" : color; // el diagrama solo tiene 2 tonos + gris
+    const selector = g === "cuerpo_completo" ? ".muscle-region" : `.muscle-region[data-grupo="${g}"]`;
+    document.querySelectorAll(selector).forEach((el) => {
+      el.classList.remove("carga-fresco");
+      el.classList.add(claseColor);
+    });
+  }
+
+  // Leyenda textual con el detalle exacto (grupo, hace cuánto, con qué entreno)
+  leyenda.innerHTML = "";
   empty.style.display = grupos.length ? "none" : "block";
   for (const g of grupos) {
     const { dias, act } = cargaPorGrupo[g];
-    const chip = document.createElement("div");
-    chip.className = `muscular-chip ${colorPorDias(dias)}`;
-    chip.innerHTML = `
-      <span class="muscular-grupo">${GRUPO_LABELS[g] || g}</span>
-      <span class="muscular-dias">${textoDias(dias)}</span>
-      <span class="muscular-origen">${actTipoLabel(act)}</span>
-    `;
-    grid.appendChild(chip);
+    const color = colorPorDias(dias) === "carga-baja" ? "carga-media" : colorPorDias(dias);
+    const item = document.createElement("span");
+    item.className = "muscular-leyenda-item";
+    item.innerHTML = `<span class="dot ${color}"></span> <strong>${GRUPO_LABELS[g] || g}</strong> · ${textoDias(dias)} (${actTipoLabel(act)})`;
+    leyenda.appendChild(item);
   }
 }
 
