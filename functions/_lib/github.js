@@ -27,7 +27,14 @@ export async function readJson(env, path) {
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GitHub GET ${path} -> ${res.status}`);
   const data = await res.json();
-  const content = atob(data.content.replace(/\n/g, ""));
+  // OJO: atob() a solas devuelve un string "binario" (1 carácter = 1 byte),
+  // NO texto UTF-8 decodificado. Si le pasamos eso directo a JSON.parse,
+  // cualquier tilde/Ñ (multi-byte en UTF-8) se corrompe en 2 caracteres
+  // Latin-1 sueltos (el bug de "GÃ¡ldar"). Hay que reinterpretar esos bytes
+  // como UTF-8 de verdad con TextDecoder antes de parsear.
+  const binary = atob(data.content.replace(/\n/g, ""));
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  const content = new TextDecoder("utf-8").decode(bytes);
   return { json: JSON.parse(content), sha: data.sha };
 }
 
