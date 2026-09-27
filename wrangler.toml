@@ -2,15 +2,25 @@ name = "bluepulse-webapp"
 compatibility_date = "2026-09-01"
 pages_build_output_dir = "public"
 
-# Los secretos reales (GITHUB_TOKEN, APP_PASSWORD se configuran en cloudfare)
-
+# Variables NO secretas (nombre de repo, rama): van aquí, en [vars].
+# Cloudflare Pages, cuando el proyecto usa wrangler.toml, ya no permite
+# definir variables de entorno normales desde el Dashboard — solo permite
+# "Secrets" (encriptados) ahí. Por eso DATA_REPO/DATA_BRANCH tienen que
+# vivir en este archivo para que la Function los reciba en `env`.
 [vars]
 DATA_REPO = "JaimeCuenca/bluepulse-data"
 DATA_BRANCH = "main"
+GARMIN_SYNC_REPO = "JaimeCuenca/garmin-sync"
+GARMIN_SYNC_WORKFLOW = "garmin_sync.yml"
+GARMIN_SYNC_BRANCH = "main"
+
+# Los secretos reales (GITHUB_TOKEN, GARMIN_SYNC_TOKEN, APP_PASSWORD) NO se ponen aquí.
+# Se configuran en:
+#   Cloudflare Dashboard -> Workers & Pages -> bluepulse-webapp -> Settings -> Environment variables (tipo "Secret")
+# o en local con: wrangler pages secret put GITHUB_TOKEN
 #
 # Para desarrollo local (wrangler pages dev), crea un archivo .dev.vars
 # (no se sube a git) con:
 #   GITHUB_TOKEN=ghp_xxx
-#   DATA_REPO=tu_usuario/bluepulse-data
-#   DATA_BRANCH=main
+#   GARMIN_SYNC_TOKEN=github_pat_xxx
 #   APP_PASSWORD=tu_contraseña

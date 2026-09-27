@@ -109,7 +109,8 @@ button {
   cursor: pointer;
 }
 
-button#partidos-nuevo-btn { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+button#partidos-nuevo-btn, button#garmin-sync-btn { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+button#garmin-sync-btn:disabled { opacity: 0.5; cursor: default; }
 button#login-cancel, button#partido-cancel { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
 
 .data-table {

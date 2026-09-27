@@ -217,6 +217,26 @@ async function loadGarmin() {
 document.getElementById("garmin-reload").addEventListener("click", loadGarmin);
 document.getElementById("garmin-tipo").addEventListener("change", loadGarmin);
 
+async function lanzarSyncGarmin() {
+  const btn = document.getElementById("garmin-sync-btn");
+  const statusEl = document.getElementById("garmin-sync-status");
+  btn.disabled = true;
+  statusEl.textContent = "Lanzando sincronización...";
+  try {
+    const res = await fetch("/api/garmin-sync", { method: "POST" });
+    const data = await res.json();
+    if (!data.ok) {
+      statusEl.textContent = `Error al lanzar la sincronización: ${data.error || "desconocido"}`;
+    } else {
+      statusEl.textContent = "Sincronización lanzada. Garmin tarda ~30-60s en responder; pulsa \"Actualizar\" dentro de un minuto para ver los datos nuevos.";
+    }
+  } catch (err) {
+    statusEl.textContent = "Error de red al lanzar la sincronización.";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ---------- Partidos ----------
 let partidosActuales = []; // último dataset cargado (ya con _temporada añadido)
 let partidosSort = { field: null, dir: 1 };
@@ -415,6 +435,11 @@ document.getElementById("partidos-nuevo-btn").addEventListener("click", () => {
     return;
   }
   pendingAfterLogin = () => modalPartido.showModal();
+  modalLogin.showModal();
+});
+
+document.getElementById("garmin-sync-btn").addEventListener("click", () => {
+  pendingAfterLogin = lanzarSyncGarmin;
   modalLogin.showModal();
 });
 
