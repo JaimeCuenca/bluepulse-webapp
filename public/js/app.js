@@ -7,7 +7,11 @@ if (window.lucide) {
 if (window.Chart) {
   Chart.defaults.font.family = "'Inter', sans-serif";
   Chart.defaults.color = "#8A99B5"; // --text-secondary
-  Chart.defaults.animation = { duration: 800, easing: "easeOutQuart" };
+  // OJO: nunca sustituir Chart.defaults.animation por completo — Chart.js usa
+  // ahí una estructura interna compleja (con "_fn" por tipo de propiedad) y
+  // reemplazarla rompe TODAS las gráficas con "this._fn is not a function".
+  // Hay que fusionar solo duration/easing con Object.assign.
+  Object.assign(Chart.defaults.animation, { duration: 800, easing: "easeOutQuart" });
   Chart.defaults.plugins.tooltip.backgroundColor = "#152038"; // --bg-surface-elevated
   Chart.defaults.plugins.tooltip.borderColor = "#2D82FF"; // --accent-blue
   Chart.defaults.plugins.tooltip.borderWidth = 1;
@@ -614,5 +618,13 @@ document.getElementById("form-partido").addEventListener("submit", async (e) => 
   loadPartidos();
 });
 
-// ---------- Carga inicial ----------
-loadResumen();
+// ---------- Carga inicial + pantalla de bienvenida ----------
+// El splash se muestra siempre un mínimo de 3s (para que la animación se vea
+// bien), y más si el Resumen tarda más en cargar de lo que tarda ese mínimo.
+const splashMinimo = new Promise((resolve) => setTimeout(resolve, 3000));
+const cargaResumen = loadResumen().catch(() => null);
+
+Promise.all([splashMinimo, cargaResumen]).then(() => {
+  const splash = document.getElementById("splash-screen");
+  if (splash) splash.classList.add("hide");
+});
