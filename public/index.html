@@ -29,6 +29,7 @@
 <link rel="stylesheet" href="/css/style.css" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+<script src="https://unpkg.com/body-muscles@1.0.0/dist/umd/body-muscles.umd.min.js"></script>
 </head>
 <body>
   <div id="splash-screen">
@@ -81,61 +82,11 @@
       <h3 class="resumen-subtitulo">Carga muscular</h3>
       <div class="muscular-diagrama">
         <div class="muscular-figura">
-          <svg viewBox="0 0 240 420" class="muscular-svg">
-            <!-- silueta -->
-            <g class="cuerpo-outline">
-              <ellipse cx="120" cy="38" rx="22" ry="26"/>
-              <rect x="108" y="58" width="24" height="14"/>
-              <path d="M75,72 L165,72 L172,150 L160,235 L80,235 L68,150 Z"/>
-              <path d="M75,78 L55,85 L40,175 L58,185 L75,110 Z"/>
-              <path d="M165,78 L185,85 L200,175 L182,185 L165,110 Z"/>
-              <path d="M40,175 L58,185 L48,270 L32,265 Z"/>
-              <path d="M200,175 L182,185 L192,270 L208,265 Z"/>
-              <ellipse cx="38" cy="282" rx="11" ry="16"/>
-              <ellipse cx="202" cy="282" rx="11" ry="16"/>
-              <path d="M80,235 L118,235 L114,395 L96,395 Z"/>
-              <path d="M160,235 L122,235 L126,395 L144,395 Z"/>
-              <path d="M90,395 L120,395 L120,412 L84,412 Z"/>
-              <path d="M150,395 L120,395 L120,412 L156,412 Z"/>
-            </g>
-            <!-- regiones musculares -->
-            <path data-grupo="pecho" class="muscle-region carga-fresco" d="M80,80 L120,76 L160,80 L156,130 L120,140 L84,130 Z"/>
-            <path data-grupo="hombros" class="muscle-region carga-fresco" d="M75,78 L58,86 L48,120 L70,128 L80,95 Z"/>
-            <path data-grupo="hombros" class="muscle-region carga-fresco" d="M165,78 L182,86 L192,120 L170,128 L160,95 Z"/>
-            <path data-grupo="biceps" class="muscle-region carga-fresco" d="M50,122 L70,130 L60,172 L42,166 Z"/>
-            <path data-grupo="biceps" class="muscle-region carga-fresco" d="M190,122 L170,130 L180,172 L198,166 Z"/>
-            <path data-grupo="core" class="muscle-region carga-fresco" d="M84,133 L156,133 L152,225 L88,225 Z"/>
-            <path data-grupo="piernas" class="muscle-region carga-fresco" d="M82,238 L117,238 L113,390 L98,390 Z"/>
-            <path data-grupo="piernas" class="muscle-region carga-fresco" d="M158,238 L123,238 L127,390 L142,390 Z"/>
-          </svg>
+          <div id="muscular-front"></div>
           <span class="muscular-figura-label">Delante</span>
         </div>
         <div class="muscular-figura">
-          <svg viewBox="0 0 240 420" class="muscular-svg">
-            <g class="cuerpo-outline">
-              <ellipse cx="120" cy="38" rx="22" ry="26"/>
-              <rect x="108" y="58" width="24" height="14"/>
-              <path d="M75,72 L165,72 L172,150 L160,235 L80,235 L68,150 Z"/>
-              <path d="M75,78 L55,85 L40,175 L58,185 L75,110 Z"/>
-              <path d="M165,78 L185,85 L200,175 L182,185 L165,110 Z"/>
-              <path d="M40,175 L58,185 L48,270 L32,265 Z"/>
-              <path d="M200,175 L182,185 L192,270 L208,265 Z"/>
-              <ellipse cx="38" cy="282" rx="11" ry="16"/>
-              <ellipse cx="202" cy="282" rx="11" ry="16"/>
-              <path d="M80,235 L118,235 L114,395 L96,395 Z"/>
-              <path d="M160,235 L122,235 L126,395 L144,395 Z"/>
-              <path d="M90,395 L120,395 L120,412 L84,412 Z"/>
-              <path d="M150,395 L120,395 L120,412 L156,412 Z"/>
-            </g>
-            <path data-grupo="hombros" class="muscle-region carga-fresco" d="M80,78 L120,72 L120,110 L90,120 L70,100 Z"/>
-            <path data-grupo="hombros" class="muscle-region carga-fresco" d="M160,78 L120,72 L120,110 L150,120 L170,100 Z"/>
-            <path data-grupo="espalda" class="muscle-region carga-fresco" d="M84,122 L156,122 L152,200 L88,200 Z"/>
-            <path data-grupo="triceps" class="muscle-region carga-fresco" d="M50,122 L70,130 L60,172 L42,166 Z"/>
-            <path data-grupo="triceps" class="muscle-region carga-fresco" d="M190,122 L170,130 L180,172 L198,166 Z"/>
-            <path data-grupo="gluteos" class="muscle-region carga-fresco" d="M84,203 L156,203 L150,235 L90,235 Z"/>
-            <path data-grupo="piernas" class="muscle-region carga-fresco" d="M82,238 L117,238 L113,390 L98,390 Z"/>
-            <path data-grupo="piernas" class="muscle-region carga-fresco" d="M158,238 L123,238 L127,390 L142,390 Z"/>
-          </svg>
+          <div id="muscular-back"></div>
           <span class="muscular-figura-label">Espalda</span>
         </div>
       </div>

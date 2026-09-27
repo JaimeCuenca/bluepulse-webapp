@@ -20,6 +20,20 @@ if (window.Chart) {
   Chart.defaults.plugins.title.font = { family: "'Rajdhani', sans-serif", size: 14, weight: "600" };
 }
 
+// ---------- Diagrama de cuerpo (carga muscular en Resumen) ----------
+// Librería: body-muscles (https://github.com/vulovix/body-muscles), vanilla
+// JS vía CDN, sin dependencias. Dos instancias (delante/espalda) porque cada
+// BodyChart solo pinta los músculos de SU vista; se actualizan juntas con
+// bodyState distintos (front/back) en renderCargaMuscular.
+let bodyChartFront, bodyChartBack;
+if (window.BodyMuscles) {
+  const { BodyChart, ViewSide } = window.BodyMuscles;
+  const elFront = document.getElementById("muscular-front");
+  const elBack = document.getElementById("muscular-back");
+  if (elFront) bodyChartFront = new BodyChart(elFront, { view: ViewSide.FRONT, bodyState: {} });
+  if (elBack) bodyChartBack = new BodyChart(elBack, { view: ViewSide.BACK, bodyState: {} });
+}
+
 /** Anima un número de 0 a su valor final (count-up), sustituyendo cualquier
  *  skeleton de carga que tuviera el elemento. */
 function animateValue(elId, endValue, { suffix = "", decimals = 0, duration = 600 } = {}) {
@@ -259,6 +273,60 @@ function gruposDeActividad(act) {
   return CARDIO_A_GRUPOS[clave] || [];
 }
 
+// Traduce nuestros grupos "lógicos" (pecho, hombros, ...) a los ids de
+// músculo concretos de la librería body-muscles, por separado para la vista
+// de delante y la de espalda (cada BodyChart solo entiende los ids de SU
+// vista). Un mismo grupo puede aportar ids a las dos (p.ej. "piernas": quads
+// delante, isquios/gemelos detrás).
+const GRUPO_MUSCULOS_FRONT = {
+  pecho: ["chest-upper-left", "chest-upper-right", "chest-lower-left", "chest-lower-right"],
+  hombros: ["shoulder-front-left", "shoulder-front-right", "shoulder-side-left", "shoulder-side-right"],
+  biceps: ["biceps-left", "biceps-right"],
+  piernas: [
+    "quads-left", "quads-right",
+    "adductors-left", "adductors-right",
+    "hip-flexor-left", "hip-flexor-right",
+    "tibialis-anterior-left", "tibialis-anterior-right",
+  ],
+  core: [
+    "abs-upper-left", "abs-upper-right",
+    "abs-lower-left", "abs-lower-right",
+    "obliques-left", "obliques-right",
+    "serratus-anterior-left", "serratus-anterior-right",
+  ],
+};
+
+const GRUPO_MUSCULOS_BACK = {
+  hombros: ["deltoid-rear-left", "deltoid-rear-right", "traps-upper-left", "traps-upper-right"],
+  triceps: ["triceps-long-left", "triceps-long-right", "triceps-lateral-left", "triceps-lateral-right"],
+  espalda: [
+    "lats-upper-left", "lats-upper-right",
+    "lats-mid-left", "lats-mid-right",
+    "lats-lower-left", "lats-lower-right",
+    "spine",
+    "lower-back-erectors-left", "lower-back-erectors-right",
+    "lower-back-ql-left", "lower-back-ql-right",
+    "traps-mid-left", "traps-mid-right",
+    "traps-lower-left", "traps-lower-right",
+  ],
+  gluteos: ["gluteus-medius-left", "gluteus-medius-right", "gluteus-maximus-left", "gluteus-maximus-right"],
+  piernas: [
+    "hamstrings-medial-left", "hamstrings-medial-right",
+    "hamstrings-lateral-left", "hamstrings-lateral-right",
+    "calves-gastroc-medial-left", "calves-gastroc-medial-right",
+    "calves-gastroc-lateral-left", "calves-gastroc-lateral-right",
+    "calves-soleus-left", "calves-soleus-right",
+  ],
+};
+
+/** Convierte "días desde el entreno" en la intensidad 0-10 que espera
+ *  body-muscles (0 = gris/sin carga ... 10 = rojo intenso). */
+function intensidadPorDias(dias) {
+  if (dias <= 1) return 10; // hoy / ayer
+  if (dias === 2) return 6;
+  return 3; // 3 días (DIAS_DECAIMIENTO_CARGA ya filtra lo que pasa de ahí)
+}
+
 function diasDesde(fechaStr) {
   const fecha = new Date(fechaStr + "T00:00:00");
   const hoy = new Date();
@@ -296,26 +364,22 @@ function renderCargaMuscular(actividades) {
     }
   }
 
-  // Pinta el diagrama: por defecto todas las regiones en gris ("frescas"),
-  // y las que tengan carga en rojo (hoy/ayer) o ámbar (hace 2-3 días).
-  // "cuerpo_completo" (fuerza sin detalle de series) tiñe TODAS las regiones.
-  const todasLasRegiones = document.querySelectorAll(".muscle-region");
-  todasLasRegiones.forEach((el) => {
-    el.classList.remove("carga-alta", "carga-media", "carga-fresco");
-    el.classList.add("carga-fresco");
-  });
-
+  // Pinta el diagrama de cuerpo: cada grupo con carga se traduce a los ids
+  // de músculo de body-muscles (por delante y/o por espalda) con una
+  // intensidad 0-10; el resto queda a 0 (gris) por no incluirse en bodyState.
   const grupos = GRUPO_ORDEN.filter((g) => cargaPorGrupo[g]);
+  const frontState = {};
+  const backState = {};
   for (const g of grupos) {
     const { dias } = cargaPorGrupo[g];
-    const color = colorPorDias(dias); // "carga-alta" | "carga-media" | "carga-baja"
-    const claseColor = color === "carga-baja" ? "carga-media" : color; // el diagrama solo tiene 2 tonos + gris
-    const selector = g === "cuerpo_completo" ? ".muscle-region" : `.muscle-region[data-grupo="${g}"]`;
-    document.querySelectorAll(selector).forEach((el) => {
-      el.classList.remove("carga-fresco");
-      el.classList.add(claseColor);
-    });
+    const intensity = intensidadPorDias(dias);
+    const idsFront = g === "cuerpo_completo" ? Object.values(GRUPO_MUSCULOS_FRONT).flat() : GRUPO_MUSCULOS_FRONT[g] || [];
+    const idsBack = g === "cuerpo_completo" ? Object.values(GRUPO_MUSCULOS_BACK).flat() : GRUPO_MUSCULOS_BACK[g] || [];
+    idsFront.forEach((id) => { frontState[id] = { intensity, selected: false }; });
+    idsBack.forEach((id) => { backState[id] = { intensity, selected: false }; });
   }
+  if (bodyChartFront) bodyChartFront.update({ bodyState: frontState });
+  if (bodyChartBack) bodyChartBack.update({ bodyState: backState });
 
   // Leyenda textual con el detalle exacto (grupo, hace cuánto, con qué entreno)
   leyenda.innerHTML = "";

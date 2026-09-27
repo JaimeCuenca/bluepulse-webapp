@@ -555,9 +555,9 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
   align-items: center;
   gap: 4px;
 }
-.muscular-svg {
-  width: 150px;
-  height: 262px;
+.muscular-figura #muscular-front,
+.muscular-figura #muscular-back {
+  width: 160px;
 }
 .muscular-figura-label {
   font-family: var(--font-body);
@@ -566,23 +566,6 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
   text-transform: uppercase;
   color: var(--text-secondary);
 }
-
-.cuerpo-outline path,
-.cuerpo-outline ellipse,
-.cuerpo-outline rect {
-  fill: var(--bg-surface-elevated);
-  stroke: var(--border-color);
-  stroke-width: 2;
-}
-
-.muscle-region {
-  stroke: var(--bg-main);
-  stroke-width: 1.5;
-  transition: fill 400ms ease;
-}
-.muscle-region.carga-fresco { fill: var(--text-muted); }
-.muscle-region.carga-media { fill: var(--goal-doubtful); }
-.muscle-region.carga-alta { fill: var(--goal-error); }
 
 /* Leyenda textual bajo el diagrama: qué grupo, hace cuánto y con qué entreno */
 .muscular-leyenda {
