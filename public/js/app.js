@@ -1,3 +1,42 @@
+// ---------- Iconos (Lucide) ----------
+if (window.lucide) {
+  lucide.createIcons({ attrs: { width: 16, height: 16, "stroke-width": 1.75 } });
+}
+
+// ---------- Estilo global de Chart.js (Rajdhani en tooltips, animación de entrada) ----------
+if (window.Chart) {
+  Chart.defaults.font.family = "'Inter', sans-serif";
+  Chart.defaults.color = "#8A99B5"; // --text-secondary
+  Chart.defaults.animation = { duration: 800, easing: "easeOutQuart" };
+  Chart.defaults.plugins.tooltip.backgroundColor = "#152038"; // --bg-surface-elevated
+  Chart.defaults.plugins.tooltip.borderColor = "#2D82FF"; // --accent-blue
+  Chart.defaults.plugins.tooltip.borderWidth = 1;
+  Chart.defaults.plugins.tooltip.titleFont = { family: "'Rajdhani', sans-serif", weight: "600" };
+  Chart.defaults.plugins.tooltip.bodyFont = { family: "'Rajdhani', sans-serif", weight: "600" };
+  Chart.defaults.plugins.title.font = { family: "'Rajdhani', sans-serif", size: 14, weight: "600" };
+}
+
+/** Anima un número de 0 a su valor final (count-up), sustituyendo cualquier
+ *  skeleton de carga que tuviera el elemento. */
+function animateValue(elId, endValue, { suffix = "", decimals = 0, duration = 600 } = {}) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.classList.remove("skeleton");
+  if (endValue == null || Number.isNaN(endValue)) {
+    el.textContent = "—";
+    return;
+  }
+  const startTime = performance.now();
+  function step(now) {
+    const progress = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3); // aprox. cubic-bezier(0.16, 1, 0.3, 1)
+    const current = endValue * eased;
+    el.textContent = (decimals > 0 ? current.toFixed(decimals) : Math.round(current)) + suffix;
+    if (progress < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
 // ---------- Navegación por pestañas ----------
 const tabButtons = document.querySelectorAll(".tab-btn");
 const tabPanels = document.querySelectorAll(".tab-panel");
@@ -37,9 +76,9 @@ const TIPO_LABELS = {
   nada_que_hacer: "Nada que hacer",
 };
 const TIPO_COLORS = {
-  error: "#e2544d",       // rojo
-  dudoso: "#f4b942",       // amarillo
-  nada_que_hacer: "#4fa3ff", // azul
+  error: "#FF3B5C",         // rojo (--goal-error)
+  dudoso: "#FFB800",        // amarillo (--goal-doubtful)
+  nada_que_hacer: "#2D82FF", // azul (--goal-no-chance)
 };
 function tipoLabel(tipo) {
   return TIPO_LABELS[tipo] || tipo;
@@ -54,16 +93,16 @@ const TODAS_TEMPORADAS = ["26-27", "25-26", "24-25", "23-24", "22-23"];
 // ---------- Resumen ----------
 async function loadResumen() {
   const wellness = await apiGet("/api/wellness?days=1").catch(() => null);
-  if (wellness && wellness.snapshots && wellness.snapshots.length) {
-    const last = wellness.snapshots[wellness.snapshots.length - 1];
-    document.getElementById("rc-battery").textContent = last.bateria_corporal != null ? `${last.bateria_corporal}%` : "—";
-    document.getElementById("rc-sleep").textContent = last.sueno_horas != null ? `${last.sueno_horas} h` : "—";
-  }
+  const last = wellness && wellness.snapshots && wellness.snapshots.length
+    ? wellness.snapshots[wellness.snapshots.length - 1]
+    : {};
+  animateValue("rc-battery", last.bateria_corporal, { suffix: "%" });
+  animateValue("rc-sleep", last.sueno_horas, { suffix: " h", decimals: 2 });
   const partidos = await apiGet("/api/partidos?temporada=26-27").catch(() => null);
   if (partidos && partidos.partidos) {
-    document.getElementById("rc-partidos").textContent = partidos.partidos.length;
+    animateValue("rc-partidos", partidos.partidos.length);
     const goles = partidos.partidos.reduce((s, p) => s + (p.goles_encajados || 0), 0);
-    document.getElementById("rc-goles").textContent = goles;
+    animateValue("rc-goles", goles);
   }
 }
 
@@ -83,7 +122,7 @@ async function loadWellness() {
   if (chartBattery) chartBattery.destroy();
   chartBattery = new Chart(document.getElementById("chart-battery"), {
     type: "line",
-    data: { labels, datasets: [{ label: "Batería corporal (%)", data: battery, borderColor: "#4fa3ff", tension: 0.3 }] },
+    data: { labels, datasets: [{ label: "Batería corporal (%)", data: battery, borderColor: "#4FA3FF", tension: 0.3 }] },
     options: {
       maintainAspectRatio: false,
       plugins: { title: { display: true, text: "Batería corporal" } },
@@ -94,7 +133,7 @@ async function loadWellness() {
   if (chartSleep) chartSleep.destroy();
   chartSleep = new Chart(document.getElementById("chart-sleep"), {
     type: "bar",
-    data: { labels, datasets: [{ label: "Horas de sueño", data: sleep, backgroundColor: "#7c6bff" }] },
+    data: { labels, datasets: [{ label: "Horas de sueño", data: sleep, backgroundColor: "#00C4B3" }] },
     options: {
       maintainAspectRatio: false,
       plugins: { title: { display: true, text: "Sueño" } },
@@ -354,12 +393,12 @@ function renderPartidos() {
   const partidos = partidosActuales.filter((p) => compsFiltro.includes(p.competicion));
   const ordenados = ordenarPartidos(partidos);
 
-  document.getElementById("pc-num").textContent = partidos.length;
+  animateValue("pc-num", partidos.length);
   const minutos = partidos.reduce((s, p) => s + (p.minutos_jugados || 0), 0);
   const goles = partidos.reduce((s, p) => s + (p.goles_encajados || 0), 0);
-  document.getElementById("pc-min").textContent = minutos;
-  document.getElementById("pc-goles").textContent = goles;
-  document.getElementById("pc-ratio").textContent = minutos ? ((goles / minutos) * 40).toFixed(2) : "—";
+  animateValue("pc-min", minutos);
+  animateValue("pc-goles", goles);
+  animateValue("pc-ratio", minutos ? (goles / minutos) * 40 : null, { decimals: 2 });
 
   // ---- Gráfica: tipos de gol encajado ----
   const tipoCount = {};
@@ -402,7 +441,7 @@ function renderPartidos() {
       type: "bar",
       data: {
         labels: motivos,
-        datasets: [{ label: "Goles", data: motivos.map((m) => motivoCount[m]), backgroundColor: "#e2544d" }],
+        datasets: [{ label: "Goles", data: motivos.map((m) => motivoCount[m]), backgroundColor: "#FF3B5C" }],
       },
       options: {
         maintainAspectRatio: false,
