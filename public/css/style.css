@@ -531,6 +531,28 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
 }
 .resumen-subtitulo-primera { margin-top: 0; }
 
+/* Subtítulos del Resumen que enlazan a su pestaña correspondiente
+   (Bienestar/Entrenos/Performance) */
+.resumen-subtitulo-link {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  transition: color 150ms ease;
+}
+.resumen-subtitulo-link::after {
+  content: "→";
+  font-size: 13px;
+  opacity: 0.6;
+  transition: transform 150ms ease;
+}
+.resumen-subtitulo-link:hover,
+.resumen-subtitulo-link:active {
+  color: var(--text-primary);
+}
+.resumen-subtitulo-link:hover::after { transform: translateX(3px); }
+
 /* Subtítulo "de segundo nivel", dentro de una sección (p.ej. "Último
    entreno" dentro de "Carga de entrenamientos") — más discreto que uno
    de sección para no competir visualmente con .resumen-subtitulo. */

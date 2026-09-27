@@ -54,8 +54,8 @@
     <nav class="tabs">
       <button class="tab-btn active" data-tab="resumen"><i data-lucide="layout-dashboard"></i><span>Resumen</span></button>
       <button class="tab-btn" data-tab="wellness"><i data-lucide="heart-pulse"></i><span>Bienestar</span></button>
-      <button class="tab-btn" data-tab="garmin"><i data-lucide="watch"></i><span>Garmin</span></button>
-      <button class="tab-btn" data-tab="partidos"><i data-lucide="shield"></i><span>Partidos</span></button>
+      <button class="tab-btn" data-tab="garmin"><i data-lucide="watch"></i><span>Entrenos</span></button>
+      <button class="tab-btn" data-tab="partidos"><i data-lucide="shield"></i><span>Performance</span></button>
     </nav>
     <span class="status-dot" title="Panel activo"></span>
   </header>
@@ -64,7 +64,7 @@
     <section id="tab-resumen" class="tab-panel active">
       <h2>Resumen general</h2>
 
-      <h3 class="resumen-subtitulo resumen-subtitulo-primera">Salud general</h3>
+      <h3 class="resumen-subtitulo resumen-subtitulo-primera resumen-subtitulo-link" data-ir-a-tab="wellness">Bienestar</h3>
       <div class="cards" id="resumen-cards-salud">
         <div class="card"><span class="card-label">Batería corporal (hoy)</span><span class="card-value" id="rc-battery"><span class="skeleton"></span></span></div>
         <div class="card"><span class="card-label">Sueño (última noche)</span><span class="card-value" id="rc-sleep"><span class="skeleton"></span></span></div>
@@ -87,13 +87,13 @@
       </div>
       <p class="hint" id="rc-sync-hint"></p>
 
-      <h3 class="resumen-subtitulo">Stats performance</h3>
+      <h3 class="resumen-subtitulo resumen-subtitulo-link" data-ir-a-tab="partidos">Performance</h3>
       <div class="cards" id="resumen-cards-performance">
         <div class="card"><span class="card-label">Partidos temporada 26-27</span><span class="card-value" id="rc-partidos"><span class="skeleton"></span></span></div>
         <div class="card"><span class="card-label">Goles encajados</span><span class="card-value" id="rc-goles"><span class="skeleton"></span></span></div>
       </div>
 
-      <h3 class="resumen-subtitulo">Carga de entrenamientos</h3>
+      <h3 class="resumen-subtitulo resumen-subtitulo-link" data-ir-a-tab="garmin">Entrenos</h3>
       <div class="muscular-diagrama">
         <div class="muscular-figura">
           <div id="muscular-front"></div>
@@ -124,7 +124,8 @@
     </section>
 
     <section id="tab-wellness" class="tab-panel">
-      <h2>Bienestar — sueño, batería corporal, calorías</h2>
+      <h2>Bienestar</h2>
+      <p class="hint">Sueño, batería corporal y calorías.</p>
       <div class="filters">
         <label>Últimos días: <input type="number" id="wellness-days" value="5" min="1" max="180" /></label>
         <button id="wellness-reload">Actualizar</button>
@@ -137,7 +138,8 @@
     </section>
 
     <section id="tab-garmin" class="tab-panel">
-      <h2>Actividades Garmin</h2>
+      <h2>Entrenos</h2>
+      <p class="hint">Actividades sincronizadas desde Garmin Connect.</p>
       <div class="filters">
         <label>Tipo:
           <select id="garmin-tipo">
@@ -155,7 +157,8 @@
     </section>
 
     <section id="tab-partidos" class="tab-panel">
-      <h2>Partidos — goles y estadísticas</h2>
+      <h2>Performance</h2>
+      <p class="hint">Partidos, goles y estadísticas.</p>
       <div class="filters">
         <label>Temporada:
           <select id="partidos-temporada">

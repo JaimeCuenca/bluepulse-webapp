@@ -59,17 +59,33 @@ function animateValue(elId, endValue, { suffix = "", decimals = 0, duration = 60
 const tabButtons = document.querySelectorAll(".tab-btn");
 const tabPanels = document.querySelectorAll(".tab-panel");
 
-tabButtons.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    tabButtons.forEach((b) => b.classList.remove("active"));
-    tabPanels.forEach((p) => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+/** Cambia a la pestaña "nombreTab" (el valor de data-tab: resumen, wellness,
+ *  garmin o partidos) y dispara la carga de esa sección. La usan tanto los
+ *  botones de la barra superior como los subtítulos-enlace del Resumen
+ *  (Bienestar/Entrenos/Performance), para no duplicar la lógica. */
+function irATab(nombreTab) {
+  const btn = document.querySelector(`.tab-btn[data-tab="${nombreTab}"]`);
+  const panel = document.getElementById(`tab-${nombreTab}`);
+  if (!btn || !panel) return;
 
-    if (btn.dataset.tab === "wellness") loadWellness();
-    if (btn.dataset.tab === "garmin") loadGarmin();
-    if (btn.dataset.tab === "partidos") loadPartidos();
-  });
+  tabButtons.forEach((b) => b.classList.remove("active"));
+  tabPanels.forEach((p) => p.classList.remove("active"));
+  btn.classList.add("active");
+  panel.classList.add("active");
+
+  if (nombreTab === "wellness") loadWellness();
+  if (nombreTab === "garmin") loadGarmin();
+  if (nombreTab === "partidos") loadPartidos();
+}
+
+tabButtons.forEach((btn) => {
+  btn.addEventListener("click", () => irATab(btn.dataset.tab));
+});
+
+// Subtítulos-enlace del Resumen: "Bienestar" -> pestaña wellness,
+// "Entrenos" -> pestaña garmin, "Performance" -> pestaña partidos.
+document.querySelectorAll("[data-ir-a-tab]").forEach((el) => {
+  el.addEventListener("click", () => irATab(el.dataset.irATab));
 });
 
 // ---------- Helpers ----------
