@@ -195,7 +195,7 @@ function renderPartidos() {
   const goles = partidos.reduce((s, p) => s + (p.goles_encajados || 0), 0);
   document.getElementById("pc-min").textContent = minutos;
   document.getElementById("pc-goles").textContent = goles;
-  document.getElementById("pc-ratio").textContent = minutos ? ((goles / minutos) * 60).toFixed(2) : "—";
+  document.getElementById("pc-ratio").textContent = minutos ? ((goles / minutos) * 40).toFixed(2) : "—";
 
   // ---- Gráfica: tipos de gol encajado ----
   const tipoCount = {};
