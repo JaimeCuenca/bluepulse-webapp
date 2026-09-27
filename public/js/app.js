@@ -588,7 +588,7 @@ async function loadWellness() {
     options: {
       maintainAspectRatio: false,
       plugins: {
-        title: { display: true, text: "Batería corporal (inicio → final del día)" },
+        title: { display: true, text: "Batería corporal (al despertar → al acostarte)" },
         legend: { display: false },
         tooltip: {
           callbacks: {
@@ -596,7 +596,13 @@ async function loadWellness() {
               const val = ctx.raw;
               if (!Array.isArray(val)) return "Sin datos";
               const [ini, fin] = val;
-              return `Inicio ${Math.round(ini)}% → Final ${Math.round(fin)}%`;
+              const ventana = snapshots[ctx.dataIndex] && snapshots[ctx.dataIndex].bateria_corporal_ventana;
+              const horaDespertar = ventana && ventana.despertar;
+              const horaAcostarse = ventana && ventana.acostarse;
+              return [
+                `Al despertar${horaDespertar ? " (" + horaDespertar + ")" : ""}: ${Math.round(ini)}%`,
+                `Al acostarte${horaAcostarse ? " (" + horaAcostarse + ")" : " (o última lectura)"}: ${Math.round(fin)}%`,
+              ];
             },
           },
         },
