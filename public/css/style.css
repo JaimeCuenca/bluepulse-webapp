@@ -155,7 +155,68 @@ button#login-cancel, button#partido-cancel { background: transparent; border: 1p
 
 .hint { color: var(--text-dim); font-size: 13px; }
 
-canvas { margin-bottom: 24px; }
+.chart-container {
+  position: relative;
+  height: 260px;
+  width: 100%;
+  margin-bottom: 24px;
+}
+.chart-container canvas {
+  /* Chart.js necesita que su contenedor tenga una altura fija en CSS;
+     sin esto, algunos navegadores móviles calculan una altura de 0
+     y el canvas se queda en blanco (aunque en PC se vea bien). */
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.activity-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
+.activity-item {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.activity-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.activity-summary:hover { background: rgba(255,255,255,0.03); }
+
+.activity-summary-main { display: flex; flex-direction: column; gap: 2px; }
+.activity-tipo { font-weight: 600; color: var(--text); }
+.activity-fecha { font-size: 12px; color: var(--text-dim); }
+.activity-summary-right { display: flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 13px; }
+.activity-chevron { transition: transform 0.15s ease; color: var(--accent); }
+.activity-item.open .activity-chevron { transform: rotate(90deg); }
+
+.activity-detail {
+  display: none;
+  padding: 4px 14px 14px;
+  border-top: 1px solid var(--border);
+}
+.activity-item.open .activity-detail { display: block; }
+
+.activity-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+.activity-stat { font-size: 13px; }
+.activity-stat .label { color: var(--text-dim); display: block; font-size: 11px; }
+.activity-stat .value { color: var(--text); font-weight: 600; }
+
+.exercise-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+.exercise-table th, .exercise-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.exercise-table th { color: var(--text-dim); font-weight: 500; }
 
 dialog {
   background: var(--panel);

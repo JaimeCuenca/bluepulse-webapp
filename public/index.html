@@ -53,8 +53,8 @@
         <label>Últimos días: <input type="number" id="wellness-days" value="30" min="7" max="180" /></label>
         <button id="wellness-reload">Actualizar</button>
       </div>
-      <canvas id="chart-battery" height="90"></canvas>
-      <canvas id="chart-sleep" height="90"></canvas>
+      <div class="chart-container"><canvas id="chart-battery"></canvas></div>
+      <div class="chart-container"><canvas id="chart-sleep"></canvas></div>
       <div id="wellness-empty" class="empty-state" style="display:none;">
         Todavía no hay datos sincronizados de Garmin. En cuanto corra el script de extracción (GitHub Action diaria), esta sección se rellenará sola.
       </div>
@@ -72,10 +72,7 @@
         </label>
         <button id="garmin-reload">Actualizar</button>
       </div>
-      <table class="data-table" id="garmin-table">
-        <thead><tr><th>Fecha</th><th>Tipo</th><th>Duración</th><th>Distancia</th><th>FC media</th><th>Calorías</th></tr></thead>
-        <tbody></tbody>
-      </table>
+      <div id="garmin-list" class="activity-list"></div>
       <div id="garmin-empty" class="empty-state" style="display:none;">
         Aún no hay actividades sincronizadas.
       </div>
@@ -114,10 +111,10 @@
         <div class="card"><span class="card-label">Goles/40min</span><span class="card-value" id="pc-ratio">—</span></div>
       </div>
 
-      <canvas id="chart-tipos-gol" height="100"></canvas>
+      <div class="chart-container"><canvas id="chart-tipos-gol"></canvas></div>
 
-      <div id="chart-motivos-container">
-        <canvas id="chart-motivos-error" height="120"></canvas>
+      <div id="chart-motivos-container" class="chart-container">
+        <canvas id="chart-motivos-error"></canvas>
         <p class="hint" id="chart-motivos-empty" style="display:none;">Todavía no hay goles de tipo "error" con un análisis anotado.</p>
       </div>
 

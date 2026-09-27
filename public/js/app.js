@@ -84,39 +84,133 @@ async function loadWellness() {
   chartBattery = new Chart(document.getElementById("chart-battery"), {
     type: "line",
     data: { labels, datasets: [{ label: "Batería corporal (%)", data: battery, borderColor: "#4fa3ff", tension: 0.3 }] },
-    options: { plugins: { title: { display: true, text: "Batería corporal" } }, scales: { y: { min: 0, max: 100 } } },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { title: { display: true, text: "Batería corporal" } },
+      scales: { y: { min: 0, max: 100 } },
+    },
   });
 
   if (chartSleep) chartSleep.destroy();
   chartSleep = new Chart(document.getElementById("chart-sleep"), {
     type: "bar",
     data: { labels, datasets: [{ label: "Horas de sueño", data: sleep, backgroundColor: "#7c6bff" }] },
-    options: { plugins: { title: { display: true, text: "Sueño" } } },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { title: { display: true, text: "Sueño" } },
+    },
   });
 }
 
 document.getElementById("wellness-reload").addEventListener("click", loadWellness);
 
 // ---------- Garmin actividades ----------
+const ACT_TIPO_LABELS = {
+  running: "Running",
+  fuerza: "Entreno de fuerza",
+  otro: "Actividad",
+};
+function actTipoLabel(act) {
+  return ACT_TIPO_LABELS[act.tipo] || act.tipo_garmin || "Actividad";
+}
+
+/** Extrae de forma defensiva las series de ejercicios (peso/reps) si Garmin las trae.
+ *  La forma exacta del JSON de Garmin puede variar; si no se reconoce, se muestra
+ *  igualmente el resto de datos de la actividad. */
+function extraerSeriesEjercicio(act) {
+  const raw = act.ejercicios_raw;
+  if (!raw) return null;
+  const sets = raw.exerciseSets || raw.exercise_sets || [];
+  if (!Array.isArray(sets) || !sets.length) return null;
+  return sets
+    .filter((s) => (s.setType || s.set_type || "ACTIVE") !== "REST")
+    .map((s) => {
+      const nombre =
+        (s.exercises && s.exercises[0] && (s.exercises[0].name || s.exercises[0].category)) ||
+        s.category ||
+        "Ejercicio";
+      const pesoG = s.weight ?? s.weight_g ?? null;
+      return {
+        nombre,
+        repeticiones: s.repetitionCount ?? s.repetition_count ?? null,
+        peso_kg: pesoG != null ? Math.round((pesoG / 1000) * 10) / 10 : null,
+        duracion_seg: s.duration ?? null,
+      };
+    });
+}
+
+function renderActivityDetail(act) {
+  const stats = [
+    { label: "Duración", value: fmtMinSec(act.duracion_min) },
+    { label: "Distancia", value: act.distancia_km != null ? act.distancia_km + " km" : "—" },
+    { label: "FC media", value: act.fc_media ?? "—" },
+    { label: "Calorías", value: act.calorias ?? "—" },
+  ];
+  const extra = act.raw_garmin || {};
+  if (extra.vO2MaxValue != null) stats.push({ label: "VO2 Max", value: extra.vO2MaxValue });
+  if (extra.aerobicTrainingEffect != null) stats.push({ label: "Efecto aeróbico", value: extra.aerobicTrainingEffect });
+  if (extra.anaerobicTrainingEffect != null) stats.push({ label: "Efecto anaeróbico", value: extra.anaerobicTrainingEffect });
+  if (extra.elevationGain != null) stats.push({ label: "Desnivel +", value: extra.elevationGain + " m" });
+
+  const statsHtml = stats
+    .map((s) => `<div class="activity-stat"><span class="label">${s.label}</span><span class="value">${s.value}</span></div>`)
+    .join("");
+
+  const series = extraerSeriesEjercicio(act);
+  let ejerciciosHtml = "";
+  if (series && series.length) {
+    ejerciciosHtml = `
+      <table class="exercise-table">
+        <thead><tr><th>Ejercicio</th><th>Reps</th><th>Peso</th></tr></thead>
+        <tbody>
+          ${series
+            .map(
+              (s) => `<tr><td>${s.nombre}</td><td>${s.repeticiones ?? "—"}</td><td>${s.peso_kg != null ? s.peso_kg + " kg" : "—"}</td></tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>`;
+  } else if (act.tipo === "fuerza") {
+    ejerciciosHtml = `<p class="hint">No hay detalle de series/repeticiones para este entreno.</p>`;
+  }
+
+  return `<div class="activity-stats-grid">${statsHtml}</div>${ejerciciosHtml}`;
+}
+
 async function loadGarmin() {
   const tipo = document.getElementById("garmin-tipo").value;
   const data = await apiGet(`/api/garmin?tipo=${tipo}&limit=30`);
-  const tbody = document.querySelector("#garmin-table tbody");
-  tbody.innerHTML = "";
+  const list = document.getElementById("garmin-list");
+  list.innerHTML = "";
   const activities = data.activities || [];
   document.getElementById("garmin-empty").style.display = activities.length ? "none" : "block";
 
   for (const act of activities) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${act.fecha ?? "—"}</td>
-      <td>${act.tipo ?? "—"}</td>
-      <td>${fmtMinSec(act.duracion_min)}</td>
-      <td>${act.distancia_km != null ? act.distancia_km + " km" : "—"}</td>
-      <td>${act.fc_media ?? "—"}</td>
-      <td>${act.calorias ?? "—"}</td>
+    const item = document.createElement("div");
+    item.className = "activity-item";
+    item.innerHTML = `
+      <div class="activity-summary">
+        <div class="activity-summary-main">
+          <span class="activity-tipo">${actTipoLabel(act)}</span>
+          <span class="activity-fecha">${act.fecha ?? "—"}</span>
+        </div>
+        <div class="activity-summary-right">
+          <span>${fmtMinSec(act.duracion_min)}</span>
+          <span class="activity-chevron">▶</span>
+        </div>
+      </div>
+      <div class="activity-detail"></div>
     `;
-    tbody.appendChild(tr);
+    const detail = item.querySelector(".activity-detail");
+    const summary = item.querySelector(".activity-summary");
+    summary.addEventListener("click", () => {
+      const abierto = item.classList.toggle("open");
+      if (abierto && !detail.dataset.loaded) {
+        detail.innerHTML = renderActivityDetail(act);
+        detail.dataset.loaded = "1";
+      }
+    });
+    list.appendChild(item);
   }
 }
 
@@ -212,7 +306,7 @@ function renderPartidos() {
       labels: tipos.map(tipoLabel),
       datasets: [{ data: tipos.map((t) => tipoCount[t]), backgroundColor: tipos.map(tipoColor) }],
     },
-    options: { plugins: { title: { display: true, text: "Tipos de gol encajado" } } },
+    options: { maintainAspectRatio: false, plugins: { title: { display: true, text: "Tipos de gol encajado" } } },
   });
 
   // ---- Gráfica: motivos de los goles de tipo "error" ----
@@ -241,6 +335,7 @@ function renderPartidos() {
         datasets: [{ label: "Goles", data: motivos.map((m) => motivoCount[m]), backgroundColor: "#e2544d" }],
       },
       options: {
+        maintainAspectRatio: false,
         indexAxis: "y",
         plugins: { title: { display: true, text: "Motivos de los goles por error" }, legend: { display: false } },
         scales: { x: { ticks: { precision: 0 } } },
