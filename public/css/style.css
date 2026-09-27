@@ -670,3 +670,67 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
 .muscular-leyenda-item .dot.carga-alta { background: var(--goal-error); }
 .muscular-leyenda-item .dot.carga-media { background: var(--goal-doubtful); }
 .muscular-leyenda-item strong { color: var(--text-primary); font-weight: 600; }
+
+/* ---------- Tarjetas clicables del Resumen (batería / calorías -> Bienestar) ---------- */
+.card-clicable { cursor: pointer; }
+.card-ver-mas {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--accent-blue-glow);
+  margin-top: 2px;
+  opacity: 0.85;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+.card-clicable:hover .card-ver-mas { opacity: 1; transform: translateX(2px); }
+
+/* ---------- Bienestar: comentario de riesgo de lesión / descanso recomendado ---------- */
+.wellness-readiness {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.wellness-readiness-titulo {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wellness-readiness-item { font-size: 13px; color: var(--text-secondary); }
+.wellness-readiness-item strong { color: var(--text-primary); }
+.wellness-readiness-origen { font-size: 11px; color: var(--text-muted); }
+
+/* ---------- Actividad: botón "ver más datos" y su grid extra ---------- */
+.activity-ver-mas-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--accent-blue-glow);
+  font-size: 12px;
+  padding: 6px 12px;
+  margin-top: var(--space-xs);
+}
+.activity-ver-mas-btn:hover { box-shadow: none; border-color: var(--border-focus); }
+.activity-stats-grid-extra {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px dashed var(--border-color);
+}
+.activity-detail-section-titulo {
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: var(--space-sm) 0 4px;
+}

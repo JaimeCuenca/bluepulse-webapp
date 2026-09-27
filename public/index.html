@@ -66,15 +66,16 @@
 
       <h3 class="resumen-subtitulo resumen-subtitulo-primera resumen-subtitulo-link" data-ir-a-tab="wellness">Bienestar</h3>
       <div class="cards" id="resumen-cards-salud">
-        <div class="card"><span class="card-label">Batería corporal (hoy)</span><span class="card-value" id="rc-battery"><span class="skeleton"></span></span></div>
+        <div class="card card-clicable" id="rc-battery-card" data-ir-a-tab="wellness"><span class="card-label">Batería corporal (hoy)</span><span class="card-value" id="rc-battery"><span class="skeleton"></span></span><span class="card-ver-mas">Ver evolución del día →</span></div>
         <div class="card"><span class="card-label">Sueño (última noche)</span><span class="card-value" id="rc-sleep"><span class="skeleton"></span></span></div>
-        <div class="card card-kcal">
+        <div class="card card-kcal card-clicable" id="rc-kcal-card" data-ir-a-tab="wellness">
           <span class="card-label">Calorías (hoy)</span>
           <span class="card-value" id="rc-kcal-total"><span class="skeleton"></span></span>
           <div class="card-subvalues">
             <span class="card-subvalue">Activas <strong id="rc-kcal-activas">—</strong></span>
             <span class="card-subvalue">Pasivas <strong id="rc-kcal-pasivas">—</strong></span>
           </div>
+          <span class="card-ver-mas">Ver por día →</span>
         </div>
         <div class="card">
           <span class="card-label">VO2 Max (ml/kg/min)</span>
@@ -130,7 +131,15 @@
         <label>Últimos días: <input type="number" id="wellness-days" value="5" min="1" max="180" /></label>
         <button id="wellness-reload">Actualizar</button>
       </div>
+
+      <div id="wellness-readiness" class="wellness-readiness" style="display:none;"></div>
+
+      <p class="hint">Batería corporal: inicio y final de cada día (barra = rango recorrido).</p>
       <div class="chart-container"><canvas id="chart-battery"></canvas></div>
+
+      <p class="hint">Calorías quemadas por día: totales, activas y pasivas.</p>
+      <div class="chart-container"><canvas id="chart-kcal"></canvas></div>
+
       <div class="chart-container"><canvas id="chart-sleep"></canvas></div>
       <div id="wellness-empty" class="empty-state" style="display:none;">
         Todavía no hay datos sincronizados de Garmin. En cuanto corra el script de extracción (GitHub Action diaria), esta sección se rellenará sola.
@@ -141,6 +150,14 @@
       <h2>Entrenos</h2>
       <p class="hint">Actividades sincronizadas desde Garmin Connect.</p>
       <div class="filters">
+        <label>Periodo:
+          <select id="garmin-rango">
+            <option value="semana">Esta semana</option>
+            <option value="mes">Este mes</option>
+            <option value="3meses">Últimos 3 meses</option>
+            <option value="todo">Todo</option>
+          </select>
+        </label>
         <label>Tipo:
           <select id="garmin-tipo">
             <option value="todos">Todos</option>

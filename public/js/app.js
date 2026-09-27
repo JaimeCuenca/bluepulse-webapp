@@ -101,7 +101,7 @@ function fmtMinSec(totalMin) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-let chartBattery, chartSleep, chartGoles, chartMotivos;
+let chartBattery, chartSleep, chartKcal, chartGoles, chartMotivos;
 
 // ---------- Tipos de gol: nombre visible y color ----------
 const TIPO_LABELS = {
@@ -477,26 +477,153 @@ function renderUltimoEntreno(actividades) {
 }
 
 // ---------- Bienestar ----------
+
+/** Busca de forma laxa un valor dentro de un objeto (y un nivel de anidación
+ *  hacia dentro) cuya clave contenga alguna de las palabras dadas. Los JSON
+ *  crudos de training readiness / training status de Garmin varían de forma
+ *  y de nombre de campo según cuenta/reloj, así que en vez de asumir una
+ *  forma exacta buscamos por coincidencia de nombre — si no se encuentra
+ *  nada, simplemente no se muestra ese dato (no rompe nada). */
+function buscarCampoLaxo(obj, claves, profundidad = 1) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+  for (const k of Object.keys(obj)) {
+    if (claves.some((c) => k.toLowerCase().includes(c)) && obj[k] != null && typeof obj[k] !== "object") {
+      return obj[k];
+    }
+  }
+  if (profundidad > 0) {
+    for (const k of Object.keys(obj)) {
+      if (obj[k] && typeof obj[k] === "object") {
+        const encontrado = buscarCampoLaxo(Array.isArray(obj[k]) ? obj[k][0] : obj[k], claves, profundidad - 1);
+        if (encontrado != null) return encontrado;
+      }
+    }
+  }
+  return null;
+}
+
+/** Extrae del snapshot de wellness más reciente un resumen de "riesgo de
+ *  lesión / descanso recomendado" a partir de los JSON crudos de training
+ *  readiness y training status que guarda extract_garmin.py. */
+function extraerReadiness(snapshot) {
+  if (!snapshot) return null;
+  let readiness = snapshot.training_readiness_raw;
+  if (Array.isArray(readiness)) readiness = readiness[0];
+  let status = snapshot.training_status_raw;
+  if (Array.isArray(status)) status = status[0];
+  if (!readiness && !status) return null;
+
+  const score = buscarCampoLaxo(readiness, ["score"]);
+  const nivel = buscarCampoLaxo(readiness, ["level"]);
+  const feedback = buscarCampoLaxo(readiness, ["feedbacklong", "feedback"]);
+  const recoveryTime = buscarCampoLaxo(readiness, ["recoverytime"]) ?? buscarCampoLaxo(status, ["recoverytime"]);
+  const acwr = buscarCampoLaxo(readiness, ["acutechronic", "acwr"]);
+  const estadoForma = buscarCampoLaxo(status, ["trainingstatus", "status"]);
+
+  if ([score, nivel, feedback, recoveryTime, estadoForma].every((v) => v == null)) return null;
+  return { score, nivel, feedback, recoveryTime, acwr, estadoForma };
+}
+
+function renderReadiness(snapshots) {
+  const box = document.getElementById("wellness-readiness");
+  const ultimoConDato = [...snapshots].reverse().find((s) => extraerReadiness(s));
+  const r = ultimoConDato ? extraerReadiness(ultimoConDato) : null;
+  if (!r) {
+    box.style.display = "none";
+    return;
+  }
+
+  const items = [];
+  if (r.score != null) items.push(`<span class="wellness-readiness-item">Preparación (readiness): <strong>${r.score}</strong></span>`);
+  if (r.nivel != null) items.push(`<span class="wellness-readiness-item">Nivel: <strong>${r.nivel}</strong></span>`);
+  if (r.estadoForma != null) items.push(`<span class="wellness-readiness-item">Estado de forma: <strong>${r.estadoForma}</strong></span>`);
+  if (r.recoveryTime != null) items.push(`<span class="wellness-readiness-item">Descanso recomendado: <strong>${fmtMinSec(Math.round(r.recoveryTime))}</strong></span>`);
+  if (r.acwr != null) items.push(`<span class="wellness-readiness-item">Carga aguda:crónica: <strong>${r.acwr}</strong></span>`);
+
+  box.innerHTML = `
+    <span class="wellness-readiness-titulo">🩺 Riesgo de lesión y descanso (según Garmin)</span>
+    ${items.join("")}
+    ${r.feedback ? `<span class="wellness-readiness-item">${r.feedback}</span>` : ""}
+    <span class="wellness-readiness-origen">Según los datos de preparación / estado de forma del ${ultimoConDato.fecha}. Garmin no recalcula esto todos los días.</span>
+  `;
+  box.style.display = "flex";
+}
+
 async function loadWellness() {
   const days = document.getElementById("wellness-days").value || 30;
   const data = await apiGet(`/api/wellness?days=${days}`);
   const snapshots = data.snapshots || [];
 
   document.getElementById("wellness-empty").style.display = snapshots.length ? "none" : "block";
+  renderReadiness(snapshots);
   if (!snapshots.length) return;
 
   const labels = snapshots.map((s) => s.fecha);
-  const battery = snapshots.map((s) => s.bateria_corporal ?? null);
   const sleep = snapshots.map((s) => s.sueno_horas ?? null);
+
+  // Batería corporal: en vez de un único punto (la última lectura del día),
+  // se dibuja como una barra "flotante" entre el valor de inicio y el de
+  // final del día, para que se vea cómo ha variado. Verde si terminó más
+  // alta que empezó, naranja si terminó más baja (lo habitual).
+  const batteryRango = snapshots.map((s) => {
+    const inicio = s.bateria_corporal_inicio ?? s.bateria_corporal ?? null;
+    const fin = s.bateria_corporal ?? s.bateria_corporal_inicio ?? null;
+    if (inicio == null && fin == null) return null;
+    return [inicio, fin];
+  });
+  const batteryColores = snapshots.map((s) => {
+    const inicio = s.bateria_corporal_inicio;
+    const fin = s.bateria_corporal;
+    if (inicio == null || fin == null) return "#4FA3FF";
+    return fin >= inicio ? "#00E676" : "#FF9100";
+  });
 
   if (chartBattery) chartBattery.destroy();
   chartBattery = new Chart(document.getElementById("chart-battery"), {
-    type: "line",
-    data: { labels, datasets: [{ label: "Batería corporal (%)", data: battery, borderColor: "#4FA3FF", tension: 0.3 }] },
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{ label: "Batería corporal: inicio → final (%)", data: batteryRango, backgroundColor: batteryColores, borderRadius: 4 }],
+    },
     options: {
       maintainAspectRatio: false,
-      plugins: { title: { display: true, text: "Batería corporal" } },
+      plugins: {
+        title: { display: true, text: "Batería corporal (inicio → final del día)" },
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const val = ctx.raw;
+              if (!Array.isArray(val)) return "Sin datos";
+              const [ini, fin] = val;
+              return `Inicio ${Math.round(ini)}% → Final ${Math.round(fin)}%`;
+            },
+          },
+        },
+      },
       scales: { y: { min: 0, max: 100 } },
+    },
+  });
+
+  // Calorías por día: histograma con totales, activas y pasivas juntas.
+  const kcalTotales = snapshots.map((s) => s.kcal_totales ?? null);
+  const kcalActivas = snapshots.map((s) => s.kcal_activas ?? null);
+  const kcalPasivas = snapshots.map((s) => s.kcal_pasivas ?? null);
+
+  if (chartKcal) chartKcal.destroy();
+  chartKcal = new Chart(document.getElementById("chart-kcal"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        { label: "Totales", data: kcalTotales, backgroundColor: "#2D82FF" },
+        { label: "Activas", data: kcalActivas, backgroundColor: "#00E676" },
+        { label: "Pasivas", data: kcalPasivas, backgroundColor: "#4C5975" },
+      ],
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { title: { display: true, text: "Calorías por día" } },
     },
   });
 
@@ -550,6 +677,52 @@ function actTipoLabel(act) {
 /** Extrae de forma defensiva las series de ejercicios (peso/reps) si Garmin las trae.
  *  La forma exacta del JSON de Garmin puede variar; si no se reconoce, se muestra
  *  igualmente el resto de datos de la actividad. */
+// ---------- "Ver más datos" en el detalle de actividad ----------
+// Nombres de campo tal cual los devuelve el resumen de actividad de Garmin
+// Connect (pueden variar algo según el tipo de reloj/actividad); cualquier
+// campo que no aparezca simplemente no se muestra, no rompe nada.
+const CAMPOS_EXTRA_ACTIVIDAD = [
+  { claves: ["averageRunningCadenceInStepsPerMinute", "averageBikingCadenceInRevPerMinute", "avgCadence"], label: "Cadencia media", fmt: (v) => Math.round(v) + " spm" },
+  { claves: ["maxRunningCadenceInStepsPerMinute", "maxBikingCadenceInRevPerMinute", "maxCadence"], label: "Cadencia máxima", fmt: (v) => Math.round(v) + " spm" },
+  { claves: ["avgPower"], label: "Potencia media", fmt: (v) => Math.round(v) + " W" },
+  { claves: ["maxPower"], label: "Potencia máxima", fmt: (v) => Math.round(v) + " W" },
+  { claves: ["normPower"], label: "Potencia normalizada", fmt: (v) => Math.round(v) + " W" },
+  { claves: ["avgStrideLength"], label: "Zancada media", fmt: (v) => (v / 100).toFixed(2) + " m" },
+  { claves: ["avgVerticalOscillation"], label: "Oscilación vertical", fmt: (v) => v.toFixed(1) + " cm" },
+  { claves: ["avgGroundContactTime"], label: "Tiempo de contacto (vuelo)", fmt: (v) => Math.round(v) + " ms" },
+  { claves: ["avgVerticalRatio"], label: "Ratio vertical", fmt: (v) => v.toFixed(1) + " %" },
+  { claves: ["maxHR"], label: "FC máxima", fmt: (v) => Math.round(v) + " ppm" },
+  { claves: ["recoveryHeartRate"], label: "FC recuperación", fmt: (v) => Math.round(v) + " ppm" },
+  { claves: ["activityTrainingLoad"], label: "Carga de entreno", fmt: (v) => Math.round(v) },
+  { claves: ["elevationLoss"], label: "Desnivel −", fmt: (v) => Math.round(v) + " m" },
+  { claves: ["moderateIntensityMinutes"], label: "Min. intensidad moderada", fmt: (v) => Math.round(v) + " min" },
+  { claves: ["vigorousIntensityMinutes"], label: "Min. intensidad vigorosa", fmt: (v) => Math.round(v) + " min" },
+  { claves: ["minTemperature"], label: "Temp. mín", fmt: (v) => Math.round(v) + " °C" },
+  { claves: ["maxTemperature"], label: "Temp. máx", fmt: (v) => Math.round(v) + " °C" },
+];
+
+function extraerStatsExtra(act) {
+  const raw = act.raw_garmin || {};
+  const stats = [];
+  for (const campo of CAMPOS_EXTRA_ACTIVIDAD) {
+    const clave = campo.claves.find((c) => raw[c] != null);
+    if (clave) stats.push({ label: campo.label, value: campo.fmt(raw[clave]) });
+  }
+  return stats;
+}
+
+/** Zonas de frecuencia cardiaca (1-5) si Garmin las trajo, con el % del
+ *  tiempo total del entreno pasado en cada una. */
+function extraerZonasFC(act) {
+  const raw = act.raw_garmin || {};
+  const zonas = [];
+  for (let z = 1; z <= 5; z++) {
+    const clave = ["hrTimeInZone_" + z, "hrTimeInZone" + z].find((c) => raw[c] != null);
+    if (clave) zonas.push({ zona: z, segundos: raw[clave] });
+  }
+  return zonas;
+}
+
 function extraerSeriesEjercicio(act) {
   const raw = act.ejercicios_raw;
   if (!raw) return null;
@@ -607,7 +780,42 @@ function renderActivityDetail(act) {
     ejerciciosHtml = `<p class="hint">No hay detalle de series/repeticiones para este entreno.</p>`;
   }
 
-  return `<div class="activity-stats-grid">${statsHtml}</div>${ejerciciosHtml}`;
+  // "Ver más datos": cadencia, potencia, zancada, tiempo de contacto,
+  // zonas de FC, etc. — todo lo que Garmin trae en el resumen crudo de la
+  // actividad y que antes se descartaba. Nota: el recorrido GPS (mapa) no
+  // se muestra todavía — pedirlo requeriría una llamada extra por actividad
+  // a la API de Garmin, con riesgo de rate-limit en el sync.
+  const extraStats = extraerStatsExtra(act);
+  const zonasFC = extraerZonasFC(act);
+  let extraHtml = "";
+  if (extraStats.length || zonasFC.length) {
+    const extraStatsHtml = extraStats
+      .map((s) => `<div class="activity-stat"><span class="label">${s.label}</span><span class="value">${s.value}</span></div>`)
+      .join("");
+    let zonasHtml = "";
+    if (zonasFC.length) {
+      const totalSeg = zonasFC.reduce((s, z) => s + z.segundos, 0) || 1;
+      zonasHtml = `
+        <p class="activity-detail-section-titulo">Tiempo en zonas de FC</p>
+        <div class="activity-stats-grid-extra">
+          ${zonasFC
+            .map(
+              (z) =>
+                `<div class="activity-stat"><span class="label">Zona ${z.zona}</span><span class="value">${fmtMinSec(Math.round(z.segundos / 60))} (${Math.round((z.segundos / totalSeg) * 100)}%)</span></div>`
+            )
+            .join("")}
+        </div>`;
+    }
+    extraHtml = `
+      <div class="activity-extra" style="display:none;">
+        ${extraStats.length ? `<p class="activity-detail-section-titulo">Más datos de Garmin</p><div class="activity-stats-grid-extra">${extraStatsHtml}</div>` : ""}
+        ${zonasHtml}
+      </div>
+      <button type="button" class="activity-ver-mas-btn">Ver más datos ▾</button>
+    `;
+  }
+
+  return `<div class="activity-stats-grid">${statsHtml}</div>${ejerciciosHtml}${extraHtml}`;
 }
 
 /** Construye el elemento <div class="activity-item"> plegable/desplegable
@@ -636,6 +844,16 @@ function crearActivityItem(act) {
     if (abierto && !detail.dataset.loaded) {
       detail.innerHTML = renderActivityDetail(act);
       detail.dataset.loaded = "1";
+      const verMasBtn = detail.querySelector(".activity-ver-mas-btn");
+      if (verMasBtn) {
+        verMasBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const extra = detail.querySelector(".activity-extra");
+          const visible = extra.style.display !== "none";
+          extra.style.display = visible ? "none" : "block";
+          verMasBtn.textContent = visible ? "Ver más datos ▾" : "Ocultar datos ▲";
+        });
+      }
     }
   });
   return item;
@@ -657,10 +875,33 @@ function actualizarSelectorTipoGarmin() {
   if (valorPrevio === "todos" || tipos.includes(valorPrevio)) select.value = valorPrevio;
 }
 
-// Trae todas las actividades del servidor (el filtrado por tipo se hace en el
-// cliente, así el desplegable puede construirse con los tipos reales).
+/** Fecha "desde" (YYYY-MM-DD) según el rango elegido en el filtro de
+ *  Entrenos. "todo" no filtra por fecha (devuelve null). Por defecto el
+ *  desplegable empieza en "semana" para que la pestaña cargue rápido (antes
+ *  traía todas las actividades sincronizadas, que tardaba mucho). */
+function desdeParaRango(rango) {
+  const d = new Date();
+  if (rango === "semana") {
+    const diaSemana = (d.getDay() + 6) % 7; // 0 = lunes
+    d.setDate(d.getDate() - diaSemana);
+  } else if (rango === "mes") {
+    d.setDate(1);
+  } else if (rango === "3meses") {
+    d.setMonth(d.getMonth() - 3);
+  } else {
+    return null; // "todo"
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+// Trae las actividades del servidor ya acotadas por rango de fechas (el
+// filtrado por tipo se sigue haciendo en el cliente, así el desplegable de
+// tipo puede construirse con los tipos reales que hay en ese rango).
 async function loadGarmin() {
-  const data = await apiGet(`/api/garmin?tipo=todos&limit=60`);
+  const rango = document.getElementById("garmin-rango").value;
+  const desde = desdeParaRango(rango);
+  const url = desde ? `/api/garmin?tipo=todos&limit=200&desde=${desde}` : `/api/garmin?tipo=todos&limit=200`;
+  const data = await apiGet(url);
   garminActividadesCache = data.activities || [];
   actualizarSelectorTipoGarmin();
   renderGarminList();
@@ -681,6 +922,7 @@ function renderGarminList() {
 }
 
 document.getElementById("garmin-reload").addEventListener("click", loadGarmin);
+document.getElementById("garmin-rango").addEventListener("change", loadGarmin);
 document.getElementById("garmin-tipo").addEventListener("change", renderGarminList);
 
 async function lanzarSyncGarmin() {
