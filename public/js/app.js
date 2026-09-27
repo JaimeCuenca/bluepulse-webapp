@@ -163,10 +163,54 @@ async function loadResumen() {
     animateValue("rc-goles", goles);
   }
 
+  document.getElementById("rc-fc-reposo").textContent =
+    last.fc_reposo != null ? Math.round(last.fc_reposo) + " ppm" : "—";
+
   const garminData = await apiGet("/api/garmin?tipo=todos&limit=30").catch(() => null);
   const actividadesRecientes = (garminData && garminData.activities) || [];
   renderCargaMuscular(actividadesRecientes);
   renderUltimoEntreno(actividadesRecientes);
+  renderFormaFisica(actividadesRecientes);
+}
+
+/** Primera actividad (ya vienen ordenadas de más a menos reciente) que
+ *  tenga un valor no nulo en raw_garmin[campo]. VO2 Max y el efecto de
+ *  entreno aeróbico/anaeróbico solo los calcula Garmin tras ciertos
+ *  entrenos (sobre todo running), así que no siempre está en la última
+ *  actividad — hay que buscar hacia atrás hasta encontrarla. */
+function actividadConDato(actividades, campo) {
+  return actividades.find((a) => a.raw_garmin && a.raw_garmin[campo] != null) || null;
+}
+
+function origenActividad(act) {
+  return act ? `Según ${actTipoLabel(act).toLowerCase()} del ${act.fecha}` : "";
+}
+
+// ---------- VO2 Max + efecto de entreno (Resumen) ----------
+// A diferencia de la batería corporal, estos dos son valores que Garmin
+// recalcula solo de tanto en tanto (no cada minuto), así que en cuanto
+// aparecen ya son fiables — no sufren el mismo lag de sincronización.
+function renderFormaFisica(actividades) {
+  const actVo2 = actividadConDato(actividades, "vO2MaxValue");
+  animateValue("rc-vo2max", actVo2 ? actVo2.raw_garmin.vO2MaxValue : null, { decimals: 1 });
+  document.getElementById("rc-vo2max-origen").textContent = origenActividad(actVo2);
+
+  const actEfecto = actividadConDato(actividades, "aerobicTrainingEffect");
+  const aerobicoEl = document.getElementById("rc-efecto-aerobico");
+  const anaerobicoEl = document.getElementById("rc-efecto-anaerobico");
+  const origenEl = document.getElementById("rc-efecto-origen");
+  if (actEfecto) {
+    aerobicoEl.textContent = Number(actEfecto.raw_garmin.aerobicTrainingEffect).toFixed(1);
+    anaerobicoEl.textContent =
+      actEfecto.raw_garmin.anaerobicTrainingEffect != null
+        ? Number(actEfecto.raw_garmin.anaerobicTrainingEffect).toFixed(1)
+        : "—";
+    origenEl.textContent = origenActividad(actEfecto);
+  } else {
+    aerobicoEl.textContent = "—";
+    anaerobicoEl.textContent = "—";
+    origenEl.textContent = "Sin datos de efecto de entreno en los últimos entrenos sincronizados.";
+  }
 }
 
 // ---------- Carga muscular (Resumen) ----------

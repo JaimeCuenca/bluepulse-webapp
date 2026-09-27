@@ -63,11 +63,11 @@
   <main>
     <section id="tab-resumen" class="tab-panel active">
       <h2>Resumen general</h2>
-      <div class="cards" id="resumen-cards">
+
+      <h3 class="resumen-subtitulo resumen-subtitulo-primera">Salud general</h3>
+      <div class="cards" id="resumen-cards-salud">
         <div class="card"><span class="card-label">Batería corporal (hoy)</span><span class="card-value" id="rc-battery"><span class="skeleton"></span></span></div>
         <div class="card"><span class="card-label">Sueño (última noche)</span><span class="card-value" id="rc-sleep"><span class="skeleton"></span></span></div>
-        <div class="card"><span class="card-label">Partidos temporada 26-27</span><span class="card-value" id="rc-partidos"><span class="skeleton"></span></span></div>
-        <div class="card"><span class="card-label">Goles encajados</span><span class="card-value" id="rc-goles"><span class="skeleton"></span></span></div>
         <div class="card card-kcal">
           <span class="card-label">Calorías (hoy)</span>
           <span class="card-value" id="rc-kcal-total"><span class="skeleton"></span></span>
@@ -76,10 +76,24 @@
             <span class="card-subvalue">Pasivas <strong id="rc-kcal-pasivas">—</strong></span>
           </div>
         </div>
+        <div class="card">
+          <span class="card-label">VO2 Max (ml/kg/min)</span>
+          <span class="card-value" id="rc-vo2max"><span class="skeleton"></span></span>
+          <div class="card-subvalues">
+            <span class="card-subvalue">FC reposo <strong id="rc-fc-reposo">—</strong></span>
+          </div>
+          <span class="card-origen" id="rc-vo2max-origen"></span>
+        </div>
       </div>
       <p class="hint" id="rc-sync-hint"></p>
 
-      <h3 class="resumen-subtitulo">Carga muscular</h3>
+      <h3 class="resumen-subtitulo">Stats performance</h3>
+      <div class="cards" id="resumen-cards-performance">
+        <div class="card"><span class="card-label">Partidos temporada 26-27</span><span class="card-value" id="rc-partidos"><span class="skeleton"></span></span></div>
+        <div class="card"><span class="card-label">Goles encajados</span><span class="card-value" id="rc-goles"><span class="skeleton"></span></span></div>
+      </div>
+
+      <h3 class="resumen-subtitulo">Carga de entrenamientos</h3>
       <div class="muscular-diagrama">
         <div class="muscular-figura">
           <div id="muscular-front"></div>
@@ -93,7 +107,18 @@
       <div id="muscular-leyenda" class="muscular-leyenda"></div>
       <p class="hint" id="muscular-empty" style="display:none;">Sin entrenos en los últimos días que dejen carga muscular.</p>
 
-      <h3 class="resumen-subtitulo">Último entreno</h3>
+      <div class="cards" id="resumen-cards-carga">
+        <div class="card card-efecto">
+          <span class="card-label">Efecto de entreno (último)</span>
+          <div class="efecto-valores">
+            <div class="efecto-item"><span class="efecto-valor" id="rc-efecto-aerobico">—</span><span class="efecto-tipo">Aeróbico</span></div>
+            <div class="efecto-item"><span class="efecto-valor" id="rc-efecto-anaerobico">—</span><span class="efecto-tipo">Anaeróbico</span></div>
+          </div>
+          <span class="card-origen" id="rc-efecto-origen"></span>
+        </div>
+      </div>
+
+      <h4 class="resumen-subtitulo-menor">Último entreno</h4>
       <div id="ultimo-entreno-list" class="activity-list"></div>
       <p class="hint" id="ultimo-entreno-empty" style="display:none;">Todavía no hay actividades sincronizadas.</p>
     </section>

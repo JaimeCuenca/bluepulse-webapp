@@ -520,10 +520,25 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
 /* ---------- Resumen: subtítulos de sección, calorías, carga muscular ---------- */
 .resumen-subtitulo {
   font-family: var(--font-heading);
-  font-size: 15px;
-  letter-spacing: 0.5px;
-  color: var(--text-primary);
-  margin: var(--space-lg) 0 var(--space-sm);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent-blue-glow);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 6px;
+  margin: var(--space-xl, 32px) 0 var(--space-sm);
+}
+.resumen-subtitulo-primera { margin-top: 0; }
+
+/* Subtítulo "de segundo nivel", dentro de una sección (p.ej. "Último
+   entreno" dentro de "Carga de entrenamientos") — más discreto que uno
+   de sección para no competir visualmente con .resumen-subtitulo. */
+.resumen-subtitulo-menor {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: var(--space-md) 0 var(--space-sm);
 }
 
 .card-subvalues {
@@ -539,6 +554,43 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
 .card-subvalue strong {
   color: var(--text-primary);
   font-weight: 600;
+}
+
+/* Pequeña línea de procedencia del dato ("Según running del 26/09") en
+   tarjetas cuyo valor viene de una actividad concreta, no de "hoy". */
+.card-origen {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Tarjeta "Efecto de entreno": dos valores igual de importantes, sin un
+   número grande dominante como en las demás tarjetas. */
+.card-efecto .efecto-valores {
+  display: flex;
+  gap: var(--space-lg, 24px);
+  margin-top: 4px;
+}
+.efecto-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.efecto-valor {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--text-primary);
+}
+.efecto-tipo {
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-top: 2px;
 }
 
 /* ---------- Carga muscular: diagrama de cuerpo (delante/espalda) ---------- */
