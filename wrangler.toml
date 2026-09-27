@@ -2,10 +2,11 @@ name = "bluepulse-webapp"
 compatibility_date = "2026-09-01"
 pages_build_output_dir = "public"
 
-# Los secretos reales (GITHUB_TOKEN, DATA_REPO, DATA_BRANCH, APP_PASSWORD)
-# NO se ponen aquí. Se configuran en:
-#   Cloudflare Dashboard -> Workers & Pages -> bluepulse-webapp -> Settings -> Environment variables
-# o en local con: wrangler pages secret put GITHUB_TOKEN
+# Los secretos reales (GITHUB_TOKEN, APP_PASSWORD se configuran en cloudfare)
+
+[vars]
+DATA_REPO = "JaimeCuenca/bluepulse-data"
+DATA_BRANCH = "main"
 #
 # Para desarrollo local (wrangler pages dev), crea un archivo .dev.vars
 # (no se sube a git) con:
