@@ -91,10 +91,20 @@
             <option value="24-25">24-25</option>
             <option value="23-24">23-24</option>
             <option value="22-23">22-23</option>
+            <option value="todas">Todas las temporadas</option>
           </select>
         </label>
         <button id="partidos-reload">Actualizar</button>
         <button id="partidos-nuevo-btn">+ Añadir partido</button>
+      </div>
+
+      <div class="filters">
+        <span class="filter-title">Competición:</span>
+        <label class="checkbox-label"><input type="checkbox" class="comp-filter" value="todas" checked /> Todas</label>
+        <label class="checkbox-label"><input type="checkbox" class="comp-filter" value="liga" checked /> Liga</label>
+        <label class="checkbox-label"><input type="checkbox" class="comp-filter" value="copa_del_rey" checked /> Copa del Rey</label>
+        <label class="checkbox-label"><input type="checkbox" class="comp-filter" value="supercopa" checked /> Supercopa</label>
+        <label class="checkbox-label"><input type="checkbox" class="comp-filter" value="playoff" checked /> Playoff</label>
       </div>
 
       <div class="cards" id="partidos-cards">
@@ -106,8 +116,22 @@
 
       <canvas id="chart-tipos-gol" height="100"></canvas>
 
+      <div id="chart-motivos-container">
+        <canvas id="chart-motivos-error" height="120"></canvas>
+        <p class="hint" id="chart-motivos-empty" style="display:none;">Todavía no hay goles de tipo "error" con un análisis anotado.</p>
+      </div>
+
       <table class="data-table" id="partidos-table">
-        <thead><tr><th>Comp.</th><th>Rival</th><th>Min</th><th>Goles</th><th>Tipos</th><th>Estimado</th></tr></thead>
+        <thead>
+          <tr>
+            <th data-sort="competicion" class="sortable">Comp. <span class="sort-arrow"></span></th>
+            <th data-sort="rival" class="sortable">Rival <span class="sort-arrow"></span></th>
+            <th data-sort="minutos_jugados" class="sortable">Min <span class="sort-arrow"></span></th>
+            <th data-sort="goles_encajados" class="sortable">Goles <span class="sort-arrow"></span></th>
+            <th>Tipos</th>
+            <th data-sort="temporada" class="sortable" id="th-temporada" style="display:none;">Temporada <span class="sort-arrow"></span></th>
+          </tr>
+        </thead>
         <tbody></tbody>
       </table>
     </section>
