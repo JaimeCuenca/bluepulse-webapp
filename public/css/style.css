@@ -547,6 +547,13 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
   .tab-btn.active svg { filter: drop-shadow(0 0 6px rgba(79, 163, 255, 0.6)); }
 
   main { padding-bottom: 84px; }
+
+  /* Las tarjetas de desglose de goles por tipo llevan 3 subvalores (%,
+     % partidos, /partido) — en 2 columnas de móvil no cabe ni de coña
+     ("0.05/par..." se salía de la tarjeta). A ancho completo y en columna
+     entran de sobra. */
+  .card-tipo-gol { grid-column: 1 / -1; }
+  .card-tipo-gol .card-subvalues { flex-direction: column; gap: 4px; }
 }
 
 /* ---------- Resumen: subtítulos de sección, calorías, carga muscular ---------- */
