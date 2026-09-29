@@ -164,8 +164,9 @@
           </select>
         </label>
         <button id="garmin-reload">Actualizar</button>
+        <button id="entreno-manual-nuevo-btn">+ Añadir entreno manual</button>
       </div>
-      <p class="hint">Para sincronizar con Garmin, usa el botón ⟳ flotante de abajo a la derecha.</p>
+      <p class="hint">Para sincronizar con Garmin, usa el botón ⟳ flotante de abajo a la derecha. Para futsal (u otro entreno que no puedas medir con el reloj), añádelo a mano.</p>
       <div id="garmin-list" class="activity-list"></div>
       <div id="garmin-empty" class="empty-state" style="display:none;">
         Aún no hay actividades sincronizadas.
@@ -264,6 +265,32 @@
         <button type="submit">Guardar</button>
       </div>
       <p class="error" id="partido-error"></p>
+    </form>
+  </dialog>
+
+  <dialog id="modal-entreno-manual">
+    <form id="form-entreno-manual">
+      <h3>Añadir entreno manual</h3>
+      <label>Fecha <input type="date" name="fecha" required /></label>
+      <label>Tipo
+        <select name="tipo">
+          <option value="futsal">Futsal</option>
+          <option value="fuerza">Fuerza</option>
+          <option value="running">Running</option>
+          <option value="otro">Otro</option>
+        </select>
+      </label>
+      <label>Duración (min) <input type="number" name="duracion_min" min="1" required /></label>
+      <label>FC media (opcional) <input type="number" name="fc_media" min="1" placeholder="si la sabes" /></label>
+      <label>Esfuerzo percibido (RPE)
+        <div class="rpe-selector" id="entreno-manual-rpe"></div>
+      </label>
+      <label>Notas (opcional) <textarea name="notas" rows="2" placeholder="p. ej. rival, sensaciones..."></textarea></label>
+      <div class="modal-actions">
+        <button type="button" id="entreno-manual-cancel">Cancelar</button>
+        <button type="submit">Guardar</button>
+      </div>
+      <p class="error" id="entreno-manual-error"></p>
     </form>
   </dialog>
 

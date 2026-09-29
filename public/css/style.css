@@ -293,7 +293,7 @@ main { padding: var(--space-lg); max-width: 1000px; margin: 0 auto; }
 
 .filters label { font-size: 13px; color: var(--text-secondary); display: flex; gap: 6px; align-items: center; }
 
-input, select {
+input, select, textarea {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
@@ -303,7 +303,12 @@ input, select {
   font-size: 13px;
   transition: border-color 150ms ease;
 }
-input:focus, select:focus { outline: none; border-color: var(--border-focus); }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--border-focus); }
+textarea { resize: vertical; font-family: var(--font-body); }
+
+/* Selector de RPE reutilizado dentro del modal de entreno manual (mismo
+   estilo que el de detalle de actividad, pero sin depender de él). */
+#entreno-manual-rpe { display: flex; gap: 4px; flex-wrap: wrap; }
 
 button {
   background: var(--accent-blue);
@@ -427,6 +432,18 @@ button#login-cancel, button#partido-cancel { background: transparent; border: 1p
 
 .activity-summary-main { display: flex; flex-direction: column; gap: 2px; }
 .activity-tipo { font-family: var(--font-heading); font-weight: 600; color: var(--text-primary); }
+.activity-manual-badge {
+  margin-left: 6px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 1px 8px;
+  vertical-align: middle;
+}
 .activity-fecha { font-size: 12px; color: var(--text-secondary); }
 .activity-summary-right { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; }
 .activity-chevron { transition: transform 150ms ease; color: var(--accent-blue-glow); }

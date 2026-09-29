@@ -807,6 +807,7 @@ const GARMIN_TIPO_LABELS = {
   swimming: "Natación",
   lap_swimming: "Natación (piscina)",
   yoga: "Yoga",
+  futsal: "Futsal",
 };
 
 /** Clave con la que se agrupa/filtra una actividad: el tipo específico de
@@ -972,7 +973,11 @@ function renderActivityDetail(act) {
   // FC media de la sesión.
   const rpeHtml = renderRpeSelector(act);
 
-  return `<div class="activity-stats-grid">${statsHtml}</div>${ejerciciosHtml}${extraHtml}${rpeHtml}`;
+  const notasHtml = act.notas
+    ? `<p class="activity-detail-section-titulo">Notas</p><p class="hint activity-notas">${act.notas}</p>`
+    : "";
+
+  return `<div class="activity-stats-grid">${statsHtml}</div>${ejerciciosHtml}${extraHtml}${notasHtml}${rpeHtml}`;
 }
 
 function renderRpeSelector(act) {
@@ -998,7 +1003,7 @@ function crearActivityItem(act) {
   item.innerHTML = `
     <div class="activity-summary">
       <div class="activity-summary-main">
-        <span class="activity-tipo">${actTipoLabel(act)}</span>
+        <span class="activity-tipo">${actTipoLabel(act)}${act.manual ? '<span class="activity-manual-badge">manual</span>' : ""}</span>
         <span class="activity-fecha">${act.fecha ?? "—"}</span>
       </div>
       <div class="activity-summary-right">
@@ -1417,6 +1422,7 @@ document.querySelectorAll("#partidos-table th.sortable").forEach((th) => {
 // ---------- Login modal ----------
 const modalLogin = document.getElementById("modal-login");
 const modalPartido = document.getElementById("modal-partido");
+const modalEntrenoManual = document.getElementById("modal-entreno-manual");
 let pendingAfterLogin = null;
 
 // Antes esto pedía la contraseña ANTES de dejarte ni abrir el formulario.
@@ -1512,6 +1518,79 @@ document.getElementById("form-partido").addEventListener("submit", async (e) => 
   form.reset();
   document.getElementById("goles-detalle-container").innerHTML = "";
   loadPartidos();
+});
+
+// ---------- Formulario "Añadir entreno manual" ----------
+// Para entrenos que no pasan por el reloj (futsal en partido/entreno, donde
+// no se puede llevar el Garmin puesto, y hasta que exista el dispositivo
+// Arduino propio): duración, RPE y unas notas, metidos a mano. Se guardan
+// con la misma forma que una actividad de Garmin (mismo endpoint /api/garmin,
+// mismo listado, mismo cálculo de carga de entreno para el riesgo de lesión),
+// solo que con manual: true en vez de venir del sync.
+function fechaLocalHoy() {
+  const d = new Date();
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mes}-${dia}`;
+}
+
+function construirRpeSelectorManual() {
+  const cont = document.getElementById("entreno-manual-rpe");
+  cont.innerHTML = Array.from({ length: 10 }, (_, i) => i + 1)
+    .map((n) => `<button type="button" class="rpe-btn" data-rpe="${n}">${n}</button>`)
+    .join("");
+  cont.querySelectorAll(".rpe-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const yaSeleccionado = btn.classList.contains("selected");
+      cont.querySelectorAll(".rpe-btn").forEach((b) => b.classList.remove("selected"));
+      if (!yaSeleccionado) btn.classList.add("selected"); // permite dejarlo sin anotar, pulsando otra vez
+    });
+  });
+}
+
+document.getElementById("entreno-manual-nuevo-btn").addEventListener("click", () => {
+  const form = document.getElementById("form-entreno-manual");
+  form.reset();
+  form.fecha.value = fechaLocalHoy();
+  construirRpeSelectorManual();
+  document.getElementById("entreno-manual-error").textContent = "";
+  modalEntrenoManual.showModal();
+});
+
+document.getElementById("entreno-manual-cancel").addEventListener("click", () => modalEntrenoManual.close());
+
+document.getElementById("form-entreno-manual").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const rpeBtn = document.querySelector("#entreno-manual-rpe .rpe-btn.selected");
+
+  const payload = {
+    manual: true,
+    fecha: form.fecha.value,
+    tipo: form.tipo.value,
+    duracion_min: parseInt(form.duracion_min.value, 10),
+    fc_media: form.fc_media.value ? parseInt(form.fc_media.value, 10) : null,
+    rpe: rpeBtn ? parseInt(rpeBtn.dataset.rpe, 10) : null,
+    notas: form.notas.value.trim() || null,
+  };
+
+  const errorEl = document.getElementById("entreno-manual-error");
+  const res = await conAuth(() =>
+    fetch("/api/garmin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!data.ok) {
+    errorEl.textContent = data.error || "Error al guardar";
+    return;
+  }
+  errorEl.textContent = "";
+  modalEntrenoManual.close();
+  loadGarmin();
+  mostrarToast("Entreno manual añadido.", { id: "entreno-manual" });
 });
 
 // ---------- Carga inicial + pantalla de bienvenida ----------
