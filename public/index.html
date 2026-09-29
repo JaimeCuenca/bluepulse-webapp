@@ -86,7 +86,7 @@
           <span class="card-origen" id="rc-vo2max-origen"></span>
         </div>
         <div class="card card-clicable card-riesgo" id="rc-riesgo-card" data-ir-a-tab="wellness">
-          <span class="card-label">🩺 Riesgo de lesión</span>
+          <span class="card-label">Riesgo de lesión</span>
           <span class="card-value" id="rc-riesgo"><span class="skeleton"></span></span>
           <span class="card-ver-mas">Ver desglose →</span>
         </div>
@@ -96,7 +96,12 @@
       <h3 class="resumen-subtitulo resumen-subtitulo-link" data-ir-a-tab="partidos">Performance</h3>
       <div class="cards" id="resumen-cards-performance">
         <div class="card"><span class="card-label">Partidos temporada 26-27</span><span class="card-value" id="rc-partidos"><span class="skeleton"></span></span></div>
-        <div class="card"><span class="card-label">Goles encajados</span><span class="card-value" id="rc-goles"><span class="skeleton"></span></span></div>
+        <div class="card card-clicable" id="rc-goles-card" data-ir-a-tab="partidos">
+          <span class="card-label">Goles encajados</span>
+          <span class="card-value" id="rc-goles"><span class="skeleton"></span></span>
+          <div class="card-subvalues" id="rc-goles-desglose"></div>
+          <span class="card-ver-mas">Ver desglose →</span>
+        </div>
       </div>
 
       <h3 class="resumen-subtitulo resumen-subtitulo-link" data-ir-a-tab="garmin">Entrenos</h3>
@@ -161,8 +166,11 @@
             <option value="mes">Este mes</option>
             <option value="3meses">Últimos 3 meses</option>
             <option value="todo">Todo</option>
+            <option value="personalizado">Personalizado…</option>
           </select>
         </label>
+        <label id="garmin-desde-label" style="display:none;">Desde <input type="date" id="garmin-desde" /></label>
+        <label id="garmin-hasta-label" style="display:none;">Hasta <input type="date" id="garmin-hasta" /></label>
         <label>Tipo:
           <select id="garmin-tipo">
             <option value="todos">Todos</option>
@@ -172,6 +180,11 @@
         <button id="entreno-manual-nuevo-btn">+ Añadir entreno manual</button>
       </div>
       <p class="hint">Para sincronizar con Garmin, usa el botón ⟳ flotante de abajo a la derecha. Para futsal (u otro entreno que no puedas medir con el reloj), añádelo a mano.</p>
+
+      <div class="chart-container-square" id="garmin-distribucion-container">
+        <canvas id="chart-tipos-entreno"></canvas>
+      </div>
+
       <div id="garmin-list" class="activity-list"></div>
       <div id="garmin-empty" class="empty-state" style="display:none;">
         Aún no hay actividades sincronizadas.
@@ -209,10 +222,44 @@
         <div class="card"><span class="card-label">Partidos</span><span class="card-value" id="pc-num"><span class="skeleton"></span></span></div>
         <div class="card"><span class="card-label">Minutos jugados</span><span class="card-value" id="pc-min"><span class="skeleton"></span></span></div>
         <div class="card"><span class="card-label">Goles encajados</span><span class="card-value" id="pc-goles"><span class="skeleton"></span></span></div>
+        <div class="card"><span class="card-label">Goles/partido</span><span class="card-value" id="pc-goles-partido"><span class="skeleton"></span></span></div>
         <div class="card"><span class="card-label">Goles/40min</span><span class="card-value" id="pc-ratio"><span class="skeleton"></span></span></div>
       </div>
 
+      <h4 class="resumen-subtitulo-menor">Goles encajados por tipo</h4>
+      <div class="cards" id="partidos-cards-tipo">
+        <div class="card card-tipo-gol" data-tipo="error">
+          <span class="card-label">Error</span>
+          <span class="card-value" id="ptg-error-count"><span class="skeleton"></span></span>
+          <div class="card-subvalues">
+            <span class="card-subvalue"><strong id="ptg-error-pct-goles">—</strong> del total de goles</span>
+            <span class="card-subvalue"><strong id="ptg-error-pct-partidos">—</strong> de los partidos</span>
+            <span class="card-subvalue"><strong id="ptg-error-partido">—</strong>/partido</span>
+          </div>
+        </div>
+        <div class="card card-tipo-gol" data-tipo="dudoso">
+          <span class="card-label">Dudoso</span>
+          <span class="card-value" id="ptg-dudoso-count"><span class="skeleton"></span></span>
+          <div class="card-subvalues">
+            <span class="card-subvalue"><strong id="ptg-dudoso-pct-goles">—</strong> del total de goles</span>
+            <span class="card-subvalue"><strong id="ptg-dudoso-pct-partidos">—</strong> de los partidos</span>
+            <span class="card-subvalue"><strong id="ptg-dudoso-partido">—</strong>/partido</span>
+          </div>
+        </div>
+        <div class="card card-tipo-gol" data-tipo="nada_que_hacer">
+          <span class="card-label">Nada que hacer</span>
+          <span class="card-value" id="ptg-nada_que_hacer-count"><span class="skeleton"></span></span>
+          <div class="card-subvalues">
+            <span class="card-subvalue"><strong id="ptg-nada_que_hacer-pct-goles">—</strong> del total de goles</span>
+            <span class="card-subvalue"><strong id="ptg-nada_que_hacer-pct-partidos">—</strong> de los partidos</span>
+            <span class="card-subvalue"><strong id="ptg-nada_que_hacer-partido">—</strong>/partido</span>
+          </div>
+        </div>
+      </div>
+
       <div class="chart-container"><canvas id="chart-tipos-gol"></canvas></div>
+
+      <div class="chart-container"><canvas id="chart-goles-partido"></canvas></div>
 
       <div id="chart-motivos-container" class="chart-container">
         <canvas id="chart-motivos-error"></canvas>

@@ -399,6 +399,21 @@ button#login-cancel, button#partido-cancel { background: transparent; border: 1p
   border-radius: var(--radius-card);
   padding: var(--space-sm);
 }
+/* Variante cuadrada para gráficos "de área" (polarArea) donde una caja
+   ancha y baja distorsiona la lectura — aquí se centra y se limita a un
+   tamaño razonable en pantallas grandes, y a lo ancho disponible en móvil. */
+.chart-container-square {
+  position: relative;
+  width: min(100%, 340px);
+  aspect-ratio: 1 / 1;
+  margin: 0 auto var(--space-lg);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  padding: var(--space-sm);
+}
+.chart-container-square canvas { width: 100% !important; height: 100% !important; }
+
 .chart-container canvas {
   /* Chart.js necesita que su contenedor tenga una altura fija en CSS;
      sin esto, algunos navegadores móviles calculan una altura de 0
@@ -733,6 +748,16 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
 .wellness-readiness.riesgo-neutro, .card-riesgo.riesgo-neutro { border-left: 3px solid var(--status-warning); }
 .wellness-readiness.riesgo-alto, .card-riesgo.riesgo-alto { border-left: 3px solid #FF5A3D; }
 .wellness-readiness.riesgo-muy-alto, .card-riesgo.riesgo-muy-alto { border-left: 3px solid var(--status-danger); }
+
+/* Tarjetas de desglose de goles por tipo (Performance), coloreadas igual
+   que el resto de la app usa esos tipos (leyenda de carga muscular, tipos
+   de gol del donut, etc.): rojo error, amarillo dudoso, azul nada que hacer. */
+.card-tipo-gol[data-tipo="error"] { border-left: 3px solid var(--goal-error); }
+.card-tipo-gol[data-tipo="error"] .card-value { color: var(--goal-error); }
+.card-tipo-gol[data-tipo="dudoso"] { border-left: 3px solid var(--goal-doubtful); }
+.card-tipo-gol[data-tipo="dudoso"] .card-value { color: var(--goal-doubtful); }
+.card-tipo-gol[data-tipo="nada_que_hacer"] { border-left: 3px solid var(--goal-no-chance); }
+.card-tipo-gol[data-tipo="nada_que_hacer"] .card-value { color: var(--goal-no-chance); }
 
 .card-riesgo .card-value { font-size: 20px; }
 .card-riesgo.riesgo-muy-bajo .card-value { color: var(--status-success); }

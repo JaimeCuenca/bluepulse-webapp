@@ -118,7 +118,7 @@ function fmtMinSec(totalMin) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-let chartBattery, chartSleep, chartKcal, chartGoles, chartMotivos;
+let chartBattery, chartSleep, chartKcal, chartGoles, chartMotivos, chartTiposEntreno, chartGolesPorPartido;
 
 // ---------- Tipos de gol: nombre visible y color ----------
 const TIPO_LABELS = {
@@ -194,6 +194,7 @@ async function loadResumen() {
     animateValue("rc-partidos", partidos.partidos.length);
     const goles = partidos.partidos.reduce((s, p) => s + (p.goles_encajados || 0), 0);
     animateValue("rc-goles", goles);
+    renderGolesDesgloseResumen(partidos.partidos, goles);
   }
 
   document.getElementById("rc-fc-reposo").textContent =
@@ -211,6 +212,32 @@ async function loadResumen() {
   fetchHistoricoRiesgo()
     .then(({ snapshotsTodos, actividades }) => renderRiesgoResumen(snapshotsTodos, actividades))
     .catch(() => renderRiesgoResumen([], []));
+}
+
+/** Bajo el número de goles encajados (Resumen), el % que son de cada tipo:
+ *  rojo = error propio, amarillo = dudoso, verde = no se podía hacer nada
+ *  (a diferencia del donut de Performance, que usa el azul de marca para
+ *  "nada que hacer" — aquí se pide expresamente un semáforo rojo/ámbar/verde
+ *  porque es justo lo que transmite "de quién es la culpa" del gol). */
+function renderGolesDesgloseResumen(partidos, totalGoles) {
+  const cont = document.getElementById("rc-goles-desglose");
+  if (!totalGoles) {
+    cont.innerHTML = "";
+    return;
+  }
+  const count = { error: 0, dudoso: 0, nada_que_hacer: 0 };
+  for (const p of partidos) {
+    for (const g of p.goles_detalle || []) {
+      if (count[g.tipo] != null) count[g.tipo]++;
+    }
+  }
+  const COLOR_SEMAFORO = { error: "var(--status-danger)", dudoso: "var(--status-warning)", nada_que_hacer: "var(--status-success)" };
+  cont.innerHTML = ["error", "dudoso", "nada_que_hacer"]
+    .map((tipo) => {
+      const pct = Math.round((count[tipo] / totalGoles) * 100);
+      return `<span class="card-subvalue">${tipoLabel(tipo)} <strong style="color: ${COLOR_SEMAFORO[tipo]}">${pct}%</strong></span>`;
+    })
+    .join("");
 }
 
 /** Primera actividad (ya vienen ordenadas de más a menos reciente) que
@@ -684,7 +711,7 @@ function renderRiesgoPropio(snapshots, actividades) {
 
   if (!riesgo.suficiente) {
     box.innerHTML = `
-      <span class="wellness-readiness-titulo">🩺 Riesgo de lesión y descanso</span>
+      <span class="wellness-readiness-titulo">Riesgo de lesión y descanso</span>
       <span class="wellness-readiness-item">Todavía no hay suficiente histórico (hacen falta ~2 semanas de sueño/batería/FC y varios entrenos) para calcular esto de forma fiable.</span>
     `;
     box.style.display = "flex";
@@ -707,7 +734,7 @@ function renderRiesgoPropio(snapshots, actividades) {
     .join("");
 
   box.innerHTML = `
-    <span class="wellness-readiness-titulo">🩺 ${nivelTexto} <span class="wellness-readiness-score">(${score}/100)</span></span>
+    <span class="wellness-readiness-titulo">${nivelTexto} <span class="wellness-readiness-score">(${score}/100)</span></span>
     <span class="wellness-readiness-item">${explicacion}</span>
     ${detalles}
     <span class="wellness-readiness-origen">Cálculo propio a partir de tu sueño, batería, FC en reposo y carga de entreno (con RPE si lo anotas en cada actividad) — no es lo que calcula Garmin, así que puede no coincidir con su app. Con poco histórico, tómalo con cautela.</span>
@@ -1167,23 +1194,104 @@ function desdeParaRango(rango) {
   return d.toISOString().slice(0, 10);
 }
 
-// Trae las actividades del servidor ya acotadas por rango de fechas (el
-// filtrado por tipo se sigue haciendo en el cliente, así el desplegable de
-// tipo puede construirse con los tipos reales que hay en ese rango).
-async function loadGarmin() {
+/** Límites {desde, hasta} (YYYY-MM-DD o null) según el filtro de periodo.
+ *  Para "personalizado" los lee de los inputs de fecha; para el resto,
+ *  "hasta" siempre es null (hasta hoy) y "desde" sale de desdeParaRango(). */
+function limitesRango() {
   const rango = document.getElementById("garmin-rango").value;
-  const desde = desdeParaRango(rango);
+  if (rango === "personalizado") {
+    return {
+      desde: document.getElementById("garmin-desde").value || null,
+      hasta: document.getElementById("garmin-hasta").value || null,
+    };
+  }
+  return { desde: desdeParaRango(rango), hasta: null };
+}
+
+function actualizarVisibilidadFechasPersonalizadas() {
+  const esPersonalizado = document.getElementById("garmin-rango").value === "personalizado";
+  document.getElementById("garmin-desde-label").style.display = esPersonalizado ? "" : "none";
+  document.getElementById("garmin-hasta-label").style.display = esPersonalizado ? "" : "none";
+}
+
+// Trae las actividades del servidor ya acotadas por "desde" (el servidor
+// sabe cortar el listado ahí); "hasta" no lo soporta la API (pensada para
+// "desde hoy hacia atrás"), así que en el rango personalizado se recorta
+// aparte, en el cliente. El filtrado por tipo se sigue haciendo en el
+// cliente, así el desplegable de tipo puede construirse con los tipos
+// reales que hay en ese rango.
+async function loadGarmin() {
+  const { desde, hasta } = limitesRango();
   const url = desde ? `/api/garmin?tipo=todos&limit=200&desde=${desde}` : `/api/garmin?tipo=todos&limit=200`;
   const data = await apiGet(url);
-  garminActividadesCache = data.activities || [];
+  let activities = data.activities || [];
+  if (hasta) activities = activities.filter((a) => a.fecha <= hasta);
+  garminActividadesCache = activities;
   actualizarSelectorTipoGarmin();
   renderGarminList();
+}
+
+/** Gráfico "de área polar" (Chart.js polarArea) con la distribución del
+ *  tipo de entrenamiento (por duración total) en el periodo filtrado. Solo
+ *  tiene sentido viendo TODOS los tipos a la vez — si se filtra por uno
+ *  concreto no hay nada que distribuir, así que el bloque entero se oculta. */
+function renderDistribucionTipos(actividades) {
+  const container = document.getElementById("garmin-distribucion-container");
+  const tipo = document.getElementById("garmin-tipo").value;
+
+  if (tipo !== "todos" || !actividades.length) {
+    container.style.display = "none";
+    return;
+  }
+
+  const duracionPorTipo = {};
+  for (const act of actividades) {
+    const clave = claveTipo(act);
+    duracionPorTipo[clave] = (duracionPorTipo[clave] || 0) + (act.duracion_min || 0);
+  }
+  const claves = Object.keys(duracionPorTipo).filter((c) => duracionPorTipo[c] > 0);
+  if (!claves.length) {
+    container.style.display = "none";
+    return;
+  }
+
+  container.style.display = "block";
+  // Paleta genérica (no todos los tipos de entreno tienen un color de marca
+  // como los goles); se cicla si hay más tipos que colores.
+  const PALETA = ["#2D82FF", "#00E676", "#FF9100", "#00C4B3", "#FF3B5C", "#8A6FFF", "#FFB800", "#4FA3FF"];
+  if (chartTiposEntreno) chartTiposEntreno.destroy();
+  try {
+    chartTiposEntreno = new Chart(document.getElementById("chart-tipos-entreno"), {
+      type: "polarArea",
+      data: {
+        labels: claves.map(formatTipoGarmin),
+        datasets: [
+          {
+            data: claves.map((c) => Math.round(duracionPorTipo[c])),
+            backgroundColor: claves.map((_, i) => PALETA[i % PALETA.length] + "cc"),
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: {
+          title: { display: true, text: "Distribución de entrenos por tipo (minutos)" },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${fmtMinSec(ctx.raw)}` } },
+        },
+        scales: { r: { ticks: { display: false } } },
+      },
+    });
+  } catch (e) {
+    console.error("No se pudo dibujar el gráfico de distribución de entrenos:", e);
+  }
 }
 
 function renderGarminList() {
   const tipo = document.getElementById("garmin-tipo").value;
   const activities =
     tipo === "todos" ? garminActividadesCache : garminActividadesCache.filter((a) => claveTipo(a) === tipo);
+
+  renderDistribucionTipos(garminActividadesCache);
 
   const list = document.getElementById("garmin-list");
   list.innerHTML = "";
@@ -1195,7 +1303,12 @@ function renderGarminList() {
 }
 
 document.getElementById("garmin-reload").addEventListener("click", loadGarmin);
-document.getElementById("garmin-rango").addEventListener("change", loadGarmin);
+document.getElementById("garmin-rango").addEventListener("change", () => {
+  actualizarVisibilidadFechasPersonalizadas();
+  if (document.getElementById("garmin-rango").value !== "personalizado") loadGarmin();
+});
+document.getElementById("garmin-desde").addEventListener("change", loadGarmin);
+document.getElementById("garmin-hasta").addEventListener("change", loadGarmin);
 document.getElementById("garmin-tipo").addEventListener("change", renderGarminList);
 
 // ---------- Toasts del FAB ----------
@@ -1329,6 +1442,81 @@ function competicionesSeleccionadas() {
     .map((cb) => cb.value);
 }
 
+/** Orden fijo por competición + jornada (temporada primero si hay varias),
+ *  para las gráficas de tendencia — independiente de cómo esté ordenada la
+ *  tabla en ese momento (el usuario puede tenerla ordenada por goles, etc.,
+ *  lo que no tendría sentido para ver una evolución cronológica). */
+function ordenarCronologico(lista) {
+  return [...lista].sort((a, b) => {
+    const ta = a._temporada || "";
+    const tb = b._temporada || "";
+    if (ta !== tb) return ta < tb ? -1 : 1;
+    const oa = COMPETICION_ORDEN[a.competicion] ?? 99;
+    const ob = COMPETICION_ORDEN[b.competicion] ?? 99;
+    if (oa !== ob) return oa - ob;
+    return (a.jornada ?? 0) - (b.jornada ?? 0);
+  });
+}
+
+/** Tarjetas de desglose de goles encajados por tipo (Performance): cuántos,
+ *  qué % suponen del total de goles, en qué % de los partidos aparece al
+ *  menos uno de ese tipo, y cuántos caen de media por partido. */
+function renderTarjetasTipoGol(partidos, totalGoles) {
+  const numPartidos = partidos.length;
+  for (const tipo of ["error", "dudoso", "nada_que_hacer"]) {
+    let count = 0;
+    let partidosConEseTipo = 0;
+    for (const p of partidos) {
+      const enEsePartido = (p.goles_detalle || []).filter((g) => g.tipo === tipo).length;
+      count += enEsePartido;
+      if (enEsePartido > 0) partidosConEseTipo++;
+    }
+    animateValue(`ptg-${tipo}-count`, count);
+    document.getElementById(`ptg-${tipo}-pct-goles`).textContent =
+      totalGoles ? Math.round((count / totalGoles) * 100) + "%" : "—";
+    document.getElementById(`ptg-${tipo}-pct-partidos`).textContent =
+      numPartidos ? Math.round((partidosConEseTipo / numPartidos) * 100) + "%" : "—";
+    document.getElementById(`ptg-${tipo}-partido`).textContent =
+      numPartidos ? (count / numPartidos).toFixed(2) : "—";
+  }
+}
+
+/** Gráfica de barras apiladas: composición (error/dudoso/nada que hacer)
+ *  de los goles encajados partido a partido, en orden cronológico — para
+ *  ver de un vistazo tanto el total encajado como de qué tipo son. */
+function renderGolesPorPartido(partidosOrdenados) {
+  const canvas = document.getElementById("chart-goles-partido");
+  const conMostrarTemporada = document.getElementById("th-temporada").style.display !== "none";
+  const labels = partidosOrdenados.map((p) => {
+    const base = `${p.jornada != null ? "J" + p.jornada : p.rival} ${p.rival}`.trim();
+    return conMostrarTemporada ? `${base} (${p._temporada})` : base;
+  });
+
+  const datasets = ["error", "dudoso", "nada_que_hacer"].map((tipo) => ({
+    label: tipoLabel(tipo),
+    data: partidosOrdenados.map((p) => (p.goles_detalle || []).filter((g) => g.tipo === tipo).length),
+    backgroundColor: tipoColor(tipo),
+  }));
+
+  if (chartGolesPorPartido) chartGolesPorPartido.destroy();
+  try {
+    chartGolesPorPartido = new Chart(canvas, {
+      type: "bar",
+      data: { labels, datasets },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { title: { display: true, text: "Goles encajados por partido (cronológico)" } },
+        scales: {
+          x: { stacked: true, ticks: { autoSkip: true, maxRotation: 60, minRotation: 0 } },
+          y: { stacked: true, ticks: { precision: 0 } },
+        },
+      },
+    });
+  } catch (e) {
+    console.error("No se pudo dibujar el gráfico de goles por partido:", e);
+  }
+}
+
 function ordenarPartidos(lista) {
   const { field, dir } = partidosSort;
   if (!field) return lista;
@@ -1368,7 +1556,13 @@ function renderPartidos() {
   const goles = partidos.reduce((s, p) => s + (p.goles_encajados || 0), 0);
   animateValue("pc-min", minutos);
   animateValue("pc-goles", goles);
+  animateValue("pc-goles-partido", partidos.length ? goles / partidos.length : null, { decimals: 2 });
   animateValue("pc-ratio", minutos ? (goles / minutos) * 40 : null, { decimals: 2 });
+
+  // Tarjetas y tabla se calculan antes de tocar Chart.js: si la librería no
+  // ha cargado bien (red lenta, bloqueador, etc.) el resto de la pestaña
+  // sigue funcionando igual.
+  renderTarjetasTipoGol(partidos, goles);
 
   // ---- Gráfica: tipos de gol encajado ----
   const tipoCount = {};
@@ -1379,14 +1573,20 @@ function renderPartidos() {
   }
   const tipos = Object.keys(tipoCount);
   if (chartGoles) chartGoles.destroy();
-  chartGoles = new Chart(document.getElementById("chart-tipos-gol"), {
-    type: "doughnut",
-    data: {
-      labels: tipos.map(tipoLabel),
-      datasets: [{ data: tipos.map((t) => tipoCount[t]), backgroundColor: tipos.map(tipoColor) }],
-    },
-    options: { maintainAspectRatio: false, plugins: { title: { display: true, text: "Tipos de gol encajado" } } },
-  });
+  try {
+    chartGoles = new Chart(document.getElementById("chart-tipos-gol"), {
+      type: "doughnut",
+      data: {
+        labels: tipos.map(tipoLabel),
+        datasets: [{ data: tipos.map((t) => tipoCount[t]), backgroundColor: tipos.map(tipoColor) }],
+      },
+      options: { maintainAspectRatio: false, plugins: { title: { display: true, text: "Tipos de gol encajado" } } },
+    });
+  } catch (e) {
+    console.error("No se pudo dibujar el gráfico de tipos de gol:", e);
+  }
+
+  renderGolesPorPartido(ordenarCronologico(partidos));
 
   // ---- Gráfica: motivos de los goles de tipo "error" ----
   const motivoCount = {};
@@ -1407,19 +1607,23 @@ function renderPartidos() {
   } else {
     motivosEmpty.style.display = "none";
     motivosCanvas.style.display = "block";
-    chartMotivos = new Chart(motivosCanvas, {
-      type: "bar",
-      data: {
-        labels: motivos,
-        datasets: [{ label: "Goles", data: motivos.map((m) => motivoCount[m]), backgroundColor: "#FF3B5C" }],
-      },
-      options: {
-        maintainAspectRatio: false,
-        indexAxis: "y",
-        plugins: { title: { display: true, text: "Motivos de los goles por error" }, legend: { display: false } },
-        scales: { x: { ticks: { precision: 0 } } },
-      },
-    });
+    try {
+      chartMotivos = new Chart(motivosCanvas, {
+        type: "bar",
+        data: {
+          labels: motivos,
+          datasets: [{ label: "Goles", data: motivos.map((m) => motivoCount[m]), backgroundColor: "#FF3B5C" }],
+        },
+        options: {
+          maintainAspectRatio: false,
+          indexAxis: "y",
+          plugins: { title: { display: true, text: "Motivos de los goles por error" }, legend: { display: false } },
+          scales: { x: { ticks: { precision: 0 } } },
+        },
+      });
+    } catch (e) {
+      console.error("No se pudo dibujar el gráfico de motivos de error:", e);
+    }
   }
 
   // ---- Tabla ----
