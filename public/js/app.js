@@ -73,9 +73,26 @@ function irATab(nombreTab) {
   btn.classList.add("active");
   panel.classList.add("active");
 
+  // "resumen" también se recarga al volver a entrar (antes solo se cargaba
+  // una vez al abrir la app, así que si sincronizabas y volvías aquí veías
+  // datos viejos hasta recargar la página entera).
+  if (nombreTab === "resumen") loadResumen();
   if (nombreTab === "wellness") loadWellness();
   if (nombreTab === "garmin") loadGarmin();
   if (nombreTab === "partidos") loadPartidos();
+}
+
+/** Vuelve a cargar los datos de la pestaña que esté activa ahora mismo (la
+ *  usa el FAB de sincronización para refrescar sin que el usuario tenga que
+ *  acordarse de pulsar "Actualizar" después de lanzar un sync). */
+function refrescarPestanaActual() {
+  const activo = document.querySelector(".tab-panel.active");
+  if (!activo) return;
+  const nombreTab = activo.id.replace("tab-", "");
+  if (nombreTab === "resumen") loadResumen();
+  else if (nombreTab === "wellness") loadWellness();
+  else if (nombreTab === "garmin") loadGarmin();
+  else if (nombreTab === "partidos") loadPartidos();
 }
 
 tabButtons.forEach((btn) => {
@@ -931,25 +948,112 @@ document.getElementById("garmin-reload").addEventListener("click", loadGarmin);
 document.getElementById("garmin-rango").addEventListener("change", loadGarmin);
 document.getElementById("garmin-tipo").addEventListener("change", renderGarminList);
 
-async function lanzarSyncGarmin() {
-  const btn = document.getElementById("garmin-sync-btn");
-  const statusEl = document.getElementById("garmin-sync-status");
-  btn.disabled = true;
-  statusEl.textContent = "Lanzando sincronización...";
-  try {
-    const res = await fetch("/api/garmin-sync", { method: "POST" });
-    const data = await res.json();
-    if (!data.ok) {
-      statusEl.textContent = `Error al lanzar la sincronización: ${data.error || "desconocido"}`;
-    } else {
-      statusEl.textContent = "Sincronización lanzada. Garmin tarda ~30-60s en responder; pulsa \"Actualizar\" dentro de un minuto para ver los datos nuevos.";
-    }
-  } catch (err) {
-    statusEl.textContent = "Error de red al lanzar la sincronización.";
-  } finally {
-    btn.disabled = false;
+// ---------- Toasts del FAB ----------
+const fabToastContainer = document.getElementById("fabToastContainer");
+const fabToastTimers = {};
+
+/** Muestra (o actualiza, si ya hay uno con el mismo "id") un toast flotante
+ *  encima del FAB. Con duracion=0 se queda fijo hasta el siguiente
+ *  mostrarToast con ese mismo id (útil mientras dura la sincronización). */
+function mostrarToast(mensaje, { id = "default", duracion = 5000 } = {}) {
+  let toast = fabToastContainer.querySelector(`[data-toast-id="${id}"]`);
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.className = "fab-toast";
+    toast.dataset.toastId = id;
+    fabToastContainer.appendChild(toast);
+  }
+  toast.textContent = mensaje;
+  requestAnimationFrame(() => toast.classList.add("show"));
+
+  if (fabToastTimers[id]) clearTimeout(fabToastTimers[id]);
+  if (duracion > 0) {
+    fabToastTimers[id] = setTimeout(() => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.remove(), 250);
+    }, duracion);
   }
 }
+
+// ---------- Autenticación "perezosa": intenta primero, pide login solo si hace falta ----------
+// Antes se pedía la contraseña ANTES de cada sync/partido, aunque la sesión
+// (cookie de 48h) siguiera viva. Ahora se intenta la acción directamente; si
+// el servidor responde 401 (sesión caducada o inexistente) se abre el modal
+// de login una sola vez y, en cuanto entras, se reintenta automáticamente la
+// misma acción — así solo lo notas cuando de verdad ha caducado.
+async function conAuth(fn) {
+  const res = await fn();
+  if (res.status !== 401) return res;
+  return new Promise((resolve, reject) => {
+    pendingAfterLogin = async () => {
+      try {
+        resolve(await fn());
+      } catch (err) {
+        reject(err);
+      }
+    };
+    modalLogin.showModal();
+  });
+}
+
+// ---------- Sincronización (FAB) ----------
+async function iniciarSync(etiqueta) {
+  fabMain.classList.add("syncing");
+  mostrarToast(`Sincronizando con ${etiqueta}...`, { id: "sync", duracion: 0 });
+  try {
+    const res = await conAuth(() => fetch("/api/garmin-sync", { method: "POST" }));
+    const data = await res.json().catch(() => ({}));
+    if (!data.ok) {
+      mostrarToast(`Error al sincronizar: ${data.error || "desconocido"}`, { id: "sync", duracion: 6000 });
+      fabMain.classList.remove("syncing");
+      return;
+    }
+    mostrarToast(`Sincronización con ${etiqueta} lanzada. Actualizando en ~45s...`, { id: "sync", duracion: 0 });
+    setTimeout(() => {
+      refrescarPestanaActual();
+      fabMain.classList.remove("syncing");
+      mostrarToast("Datos actualizados.", { id: "sync", duracion: 3500 });
+    }, 45000);
+  } catch (err) {
+    mostrarToast("Error de red al sincronizar.", { id: "sync", duracion: 6000 });
+    fabMain.classList.remove("syncing");
+  }
+}
+
+// ---------- FAB: abrir/cerrar menú y wiring de cada fuente ----------
+const fabContainer = document.getElementById("fabContainer");
+const fabMain = document.getElementById("fabMain");
+const fabBackdrop = document.getElementById("fabBackdrop");
+
+function cerrarFab() {
+  fabContainer.classList.remove("active");
+  fabBackdrop.classList.remove("active");
+}
+function toggleFab() {
+  fabContainer.classList.toggle("active");
+  fabBackdrop.classList.toggle("active", fabContainer.classList.contains("active"));
+}
+fabMain.addEventListener("click", toggleFab);
+fabBackdrop.addEventListener("click", cerrarFab);
+
+document.getElementById("fab-sync-garmin").addEventListener("click", () => {
+  cerrarFab();
+  iniciarSync("Garmin Connect");
+});
+document.getElementById("fab-sync-all").addEventListener("click", () => {
+  cerrarFab();
+  // De momento la única fuente real es Garmin; en cuanto haya más (Arduino,
+  // otra marca...) "Sincronizar todo" las lanzará todas desde aquí.
+  iniciarSync("todas las fuentes");
+});
+document.getElementById("fab-sync-device").addEventListener("click", () => {
+  cerrarFab();
+  mostrarToast("Próximamente: aún no hay ningún dispositivo Arduino/BLE conectado.", { id: "sync" });
+});
+document.getElementById("fab-sync-db").addEventListener("click", () => {
+  cerrarFab();
+  mostrarToast("Próximamente: la importación de BBDD/CSV todavía no está disponible.", { id: "sync" });
+});
 
 // ---------- Partidos ----------
 let partidosActuales = []; // último dataset cargado (ya con _temporada añadido)
@@ -1143,18 +1247,15 @@ const modalLogin = document.getElementById("modal-login");
 const modalPartido = document.getElementById("modal-partido");
 let pendingAfterLogin = null;
 
+// Antes esto pedía la contraseña ANTES de dejarte ni abrir el formulario.
+// Ahora el formulario se abre directo — el login (si hace falta) se pide al
+// guardar, dentro de conAuth, y solo si la sesión de 48h ya caducó.
 document.getElementById("partidos-nuevo-btn").addEventListener("click", () => {
   if (document.getElementById("partidos-temporada").value === "todas") {
     alert('Elige primero una temporada concreta (no "Todas") para añadir un partido.');
     return;
   }
-  pendingAfterLogin = () => modalPartido.showModal();
-  modalLogin.showModal();
-});
-
-document.getElementById("garmin-sync-btn").addEventListener("click", () => {
-  pendingAfterLogin = lanzarSyncGarmin;
-  modalLogin.showModal();
+  modalPartido.showModal();
 });
 
 document.getElementById("login-cancel").addEventListener("click", () => modalLogin.close());
@@ -1221,11 +1322,13 @@ document.getElementById("form-partido").addEventListener("submit", async (e) => 
     goles_detalle: golesDetalle,
   };
 
-  const res = await fetch("/api/partidos", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ temporada, partido }),
-  });
+  const res = await conAuth(() =>
+    fetch("/api/partidos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ temporada, partido }),
+    })
+  );
   const data = await res.json();
   const errorEl = document.getElementById("partido-error");
   if (!data.ok) {
