@@ -232,10 +232,12 @@ function renderGolesDesgloseResumen(partidos, totalGoles) {
     }
   }
   const COLOR_SEMAFORO = { error: "var(--status-danger)", dudoso: "var(--status-warning)", nada_que_hacer: "var(--status-success)" };
+  // Solo los porcentajes en color, sin etiqueta de texto (el semáforo ya
+  // dice de sobra cuál es cuál: rojo/ámbar/verde en ese orden, siempre).
   cont.innerHTML = ["error", "dudoso", "nada_que_hacer"]
     .map((tipo) => {
       const pct = Math.round((count[tipo] / totalGoles) * 100);
-      return `<span class="card-subvalue">${tipoLabel(tipo)} <strong style="color: ${COLOR_SEMAFORO[tipo]}">${pct}%</strong></span>`;
+      return `<span class="card-subvalue-pct" style="color: ${COLOR_SEMAFORO[tipo]}">${pct}%</span>`;
     })
     .join("");
 }
@@ -1484,11 +1486,21 @@ function renderTarjetasTipoGol(partidos, totalGoles) {
 /** Gráfica de barras apiladas: composición (error/dudoso/nada que hacer)
  *  de los goles encajados partido a partido, en orden cronológico — para
  *  ver de un vistazo tanto el total encajado como de qué tipo son. */
+// Nombres "bonitos" de competición para las etiquetas del eje X cuando no
+// hay jornada (copa del Rey, supercopa, playoff suelen ser partido único).
+const COMPETICION_LABELS = { liga: "Liga", copa_del_rey: "Copa del Rey", supercopa: "Supercopa", playoff: "Playoff" };
+
 function renderGolesPorPartido(partidosOrdenados) {
   const canvas = document.getElementById("chart-goles-partido");
   const conMostrarTemporada = document.getElementById("th-temporada").style.display !== "none";
   const labels = partidosOrdenados.map((p) => {
-    const base = `${p.jornada != null ? "J" + p.jornada : p.rival} ${p.rival}`.trim();
+    // Con jornada (normalmente liga): "J3 Rival". Sin jornada (copa del
+    // Rey, supercopa, playoff — partido único): "Copa del Rey Rival", no
+    // "Rival Rival" (antes se repetía el rival cuando no había jornada).
+    const base =
+      p.jornada != null
+        ? `J${p.jornada} ${p.rival}`
+        : `${COMPETICION_LABELS[p.competicion] || p.competicion} ${p.rival}`;
     return conMostrarTemporada ? `${base} (${p._temporada})` : base;
   });
 
