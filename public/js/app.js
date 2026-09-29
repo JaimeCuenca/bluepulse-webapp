@@ -555,7 +555,7 @@ function cargaActividad(act, fcReposoDelDia, fcMax) {
  *  días. */
 function renderRiesgoPropio(snapshots, actividades) {
   const box = document.getElementById("wellness-readiness");
-  box.classList.remove("riesgo-bajo", "riesgo-medio", "riesgo-alto");
+  box.classList.remove("riesgo-muy-alto", "riesgo-alto", "riesgo-neutro", "riesgo-bajo", "riesgo-muy-bajo");
 
   if (!snapshots.length) {
     box.style.display = "none";
@@ -654,8 +654,15 @@ function renderRiesgoPropio(snapshots, actividades) {
 
   const suma = componentes.reduce((s, c) => s + c.valor, 0);
   const score = clamp(Math.round(50 + 12.5 * suma), 0, 100);
-  const nivel = score >= 70 ? "bajo" : score >= 40 ? "medio" : "alto";
-  const nivelTexto = { bajo: "Riesgo bajo", medio: "Riesgo moderado", alto: "Riesgo elevado" }[nivel];
+  const nivel =
+    score < 30 ? "muy-alto" : score < 40 ? "alto" : score < 60 ? "neutro" : score < 70 ? "bajo" : "muy-bajo";
+  const nivelTexto = {
+    "muy-alto": "Riesgo muy alto",
+    alto: "Riesgo alto",
+    neutro: "Riesgo neutro",
+    bajo: "Riesgo bajo",
+    "muy-bajo": "Riesgo muy bajo",
+  }[nivel];
   box.classList.add(`riesgo-${nivel}`);
 
   const factoresNegativos = componentes.filter((c) => c.valor < -0.3).sort((a, b) => a.valor - b.valor);

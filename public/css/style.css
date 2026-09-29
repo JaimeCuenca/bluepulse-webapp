@@ -727,9 +727,11 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
 .wellness-readiness-score { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
 
 /* Semáforo del score propio de riesgo de lesión (borde izquierdo) */
-.wellness-readiness.riesgo-bajo { border-left: 3px solid var(--status-success); }
-.wellness-readiness.riesgo-medio { border-left: 3px solid var(--status-warning); }
-.wellness-readiness.riesgo-alto { border-left: 3px solid var(--status-danger); }
+.wellness-readiness.riesgo-muy-bajo { border-left: 3px solid var(--status-success); }
+.wellness-readiness.riesgo-bajo { border-left: 3px solid #7ED957; }
+.wellness-readiness.riesgo-neutro { border-left: 3px solid var(--status-warning); }
+.wellness-readiness.riesgo-alto { border-left: 3px solid #FF5A3D; }
+.wellness-readiness.riesgo-muy-alto { border-left: 3px solid var(--status-danger); }
 
 /* ---------- Esfuerzo percibido (RPE) por actividad ---------- */
 .activity-rpe {
