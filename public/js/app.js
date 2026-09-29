@@ -204,6 +204,13 @@ async function loadResumen() {
   renderCargaMuscular(actividadesRecientes);
   renderUltimoEntreno(actividadesRecientes);
   renderFormaFisica(actividadesRecientes);
+
+  // Riesgo de lesión: tarjeta resumida (el desglose completo está en
+  // Bienestar). Necesita histórico aparte (35 días de wellness + entrenos),
+  // así que se pide a parte de lo que ya se ha cargado arriba.
+  fetchHistoricoRiesgo()
+    .then(({ snapshotsTodos, actividades }) => renderRiesgoResumen(snapshotsTodos, actividades))
+    .catch(() => renderRiesgoResumen([], []));
 }
 
 /** Primera actividad (ya vienen ordenadas de más a menos reciente) que
@@ -549,18 +556,17 @@ function cargaActividad(act, fcReposoDelDia, fcMax) {
   return act.duracion_min * 5;
 }
 
-/** Pinta la caja de "riesgo de lesión y descanso" en Bienestar a partir de
+/** Cálculo puro del riesgo de lesión/descanso propio, sin tocar el DOM —
+ *  así lo puede usar tanto la caja detallada de Bienestar como la tarjeta
+ *  resumida de Resumen (y, en JS aparte, el widget de iOS). Recibe
  *  snapshots de wellness (histórico amplio, no solo lo que se ve en la
  *  gráfica) y actividades de al menos los últimos RIESGO_VENTANA_CRONICA
- *  días. */
-function renderRiesgoPropio(snapshots, actividades) {
-  const box = document.getElementById("wellness-readiness");
-  box.classList.remove("riesgo-muy-alto", "riesgo-alto", "riesgo-neutro", "riesgo-bajo", "riesgo-muy-bajo");
-
-  if (!snapshots.length) {
-    box.style.display = "none";
-    return;
-  }
+ *  días. Devuelve null si no hay ni un snapshot; { suficiente: false } si
+ *  hay snapshots pero ningún componente es calculable todavía (poco
+ *  histórico); si no, { score, nivel, nivelTexto, componentes,
+ *  factoresNegativos }. */
+function calcularRiesgo(snapshots, actividades) {
+  if (!snapshots.length) return null;
 
   const hoy = snapshots[snapshots.length - 1];
   const historicoPrevio = snapshots.slice(0, -1).slice(-RIESGO_VENTANA_BASELINE);
@@ -643,14 +649,7 @@ function renderRiesgoPropio(snapshots, actividades) {
     },
   ].filter((c) => c.valor != null);
 
-  if (!componentes.length) {
-    box.innerHTML = `
-      <span class="wellness-readiness-titulo">🩺 Riesgo de lesión y descanso</span>
-      <span class="wellness-readiness-item">Todavía no hay suficiente histórico (hacen falta ~2 semanas de sueño/batería/FC y varios entrenos) para calcular esto de forma fiable.</span>
-    `;
-    box.style.display = "flex";
-    return;
-  }
+  if (!componentes.length) return { suficiente: false };
 
   const suma = componentes.reduce((s, c) => s + c.valor, 0);
   const score = clamp(Math.round(50 + 12.5 * suma), 0, 100);
@@ -663,9 +662,38 @@ function renderRiesgoPropio(snapshots, actividades) {
     bajo: "Riesgo bajo",
     "muy-bajo": "Riesgo muy bajo",
   }[nivel];
-  box.classList.add(`riesgo-${nivel}`);
 
   const factoresNegativos = componentes.filter((c) => c.valor < -0.3).sort((a, b) => a.valor - b.valor);
+
+  return { suficiente: true, score, nivel, nivelTexto, componentes, factoresNegativos };
+}
+
+const CLASES_NIVEL_RIESGO = ["riesgo-muy-alto", "riesgo-alto", "riesgo-neutro", "riesgo-bajo", "riesgo-muy-bajo"];
+
+/** Pinta la caja detallada de "riesgo de lesión y descanso" en Bienestar
+ *  (score + qué factores pesan + el detalle de cada uno). */
+function renderRiesgoPropio(snapshots, actividades) {
+  const box = document.getElementById("wellness-readiness");
+  box.classList.remove(...CLASES_NIVEL_RIESGO);
+
+  const riesgo = calcularRiesgo(snapshots, actividades);
+  if (!riesgo) {
+    box.style.display = "none";
+    return;
+  }
+
+  if (!riesgo.suficiente) {
+    box.innerHTML = `
+      <span class="wellness-readiness-titulo">🩺 Riesgo de lesión y descanso</span>
+      <span class="wellness-readiness-item">Todavía no hay suficiente histórico (hacen falta ~2 semanas de sueño/batería/FC y varios entrenos) para calcular esto de forma fiable.</span>
+    `;
+    box.style.display = "flex";
+    return;
+  }
+
+  const { score, nivel, nivelTexto, componentes, factoresNegativos } = riesgo;
+  box.classList.add(`riesgo-${nivel}`);
+
   const explicacion = factoresNegativos.length
     ? `Pesan en contra: ${factoresNegativos.map((c) => c.nombre).join(", ")}.`
     : "Ningún factor destaca especialmente hoy.";
@@ -687,26 +715,55 @@ function renderRiesgoPropio(snapshots, actividades) {
   box.style.display = "flex";
 }
 
-async function loadWellness() {
-  const days = parseInt(document.getElementById("wellness-days").value, 10) || 30;
-  // El cálculo de riesgo necesita ~35 días de histórico (ventana crónica de
-  // 28 + margen para la media móvil) aunque el desplegable de la gráfica
-  // pida menos, así que se pide siempre lo que sea mayor y se recorta luego
-  // solo lo que se pinta en las gráficas.
-  const DIAS_HISTORICO_RIESGO = 35;
-  const diasFetch = Math.max(days, DIAS_HISTORICO_RIESGO);
-  const data = await apiGet(`/api/wellness?days=${diasFetch}`);
-  const snapshotsTodos = data.snapshots || [];
-  const snapshots = snapshotsTodos.slice(-days);
+/** Tarjeta resumida de riesgo en Resumen: solo el nivel y el score, sin
+ *  desglosar — el desglose completo está a un clic, en Bienestar (la
+ *  tarjeta ya lleva ahí via data-ir-a-tab, como el resto de tarjetas
+ *  "card-clicable"). */
+function renderRiesgoResumen(snapshots, actividades) {
+  const card = document.getElementById("rc-riesgo-card");
+  const valorEl = document.getElementById("rc-riesgo");
+  card.classList.remove(...CLASES_NIVEL_RIESGO);
 
-  document.getElementById("wellness-empty").style.display = snapshots.length ? "none" : "block";
+  const riesgo = calcularRiesgo(snapshots, actividades);
+  if (!riesgo || !riesgo.suficiente) {
+    valorEl.textContent = "—";
+    card.title = "Todavía no hay suficiente histórico para calcularlo.";
+    return;
+  }
+
+  card.classList.add(`riesgo-${riesgo.nivel}`);
+  valorEl.textContent = riesgo.nivelTexto.replace("Riesgo ", "");
+  card.title = `${riesgo.nivelTexto} (${riesgo.score}/100) — toca para ver el desglose`;
+}
+
+// El cálculo de riesgo necesita ~35 días de histórico (ventana crónica de
+// 28 + margen para la media móvil de 14), tanto de wellness como de
+// entrenos. Se usa igual en Bienestar (caja detallada) y en Resumen
+// (tarjeta compacta), así que se pide una vez desde aquí en los dos sitios
+// en vez de duplicar el fetch.
+const DIAS_HISTORICO_RIESGO = 35;
+
+async function fetchHistoricoRiesgo(diasWellnessMin = DIAS_HISTORICO_RIESGO) {
+  const diasFetch = Math.max(diasWellnessMin, DIAS_HISTORICO_RIESGO);
+  const wellness = await apiGet(`/api/wellness?days=${diasFetch}`).catch(() => null);
+  const snapshotsTodos = (wellness && wellness.snapshots) || [];
 
   const desdeRiesgo = new Date();
   desdeRiesgo.setDate(desdeRiesgo.getDate() - DIAS_HISTORICO_RIESGO);
   const garminRiesgo = await apiGet(
     `/api/garmin?tipo=todos&limit=200&desde=${desdeRiesgo.toISOString().slice(0, 10)}`
   ).catch(() => null);
-  renderRiesgoPropio(snapshotsTodos, (garminRiesgo && garminRiesgo.activities) || []);
+
+  return { snapshotsTodos, actividades: (garminRiesgo && garminRiesgo.activities) || [], wellness };
+}
+
+async function loadWellness() {
+  const days = parseInt(document.getElementById("wellness-days").value, 10) || 30;
+  const { snapshotsTodos, actividades } = await fetchHistoricoRiesgo(days);
+  const snapshots = snapshotsTodos.slice(-days);
+
+  document.getElementById("wellness-empty").style.display = snapshots.length ? "none" : "block";
+  renderRiesgoPropio(snapshotsTodos, actividades);
 
   if (!snapshots.length) return;
 

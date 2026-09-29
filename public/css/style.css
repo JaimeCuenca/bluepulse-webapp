@@ -726,12 +726,20 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
 .wellness-readiness-origen { font-size: 11px; color: var(--text-muted); }
 .wellness-readiness-score { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
 
-/* Semáforo del score propio de riesgo de lesión (borde izquierdo) */
-.wellness-readiness.riesgo-muy-bajo { border-left: 3px solid var(--status-success); }
-.wellness-readiness.riesgo-bajo { border-left: 3px solid #7ED957; }
-.wellness-readiness.riesgo-neutro { border-left: 3px solid var(--status-warning); }
-.wellness-readiness.riesgo-alto { border-left: 3px solid #FF5A3D; }
-.wellness-readiness.riesgo-muy-alto { border-left: 3px solid var(--status-danger); }
+/* Semáforo del score propio de riesgo de lesión (borde izquierdo), en la
+   caja detallada de Bienestar y en la tarjeta resumida de Resumen. */
+.wellness-readiness.riesgo-muy-bajo, .card-riesgo.riesgo-muy-bajo { border-left: 3px solid var(--status-success); }
+.wellness-readiness.riesgo-bajo, .card-riesgo.riesgo-bajo { border-left: 3px solid #7ED957; }
+.wellness-readiness.riesgo-neutro, .card-riesgo.riesgo-neutro { border-left: 3px solid var(--status-warning); }
+.wellness-readiness.riesgo-alto, .card-riesgo.riesgo-alto { border-left: 3px solid #FF5A3D; }
+.wellness-readiness.riesgo-muy-alto, .card-riesgo.riesgo-muy-alto { border-left: 3px solid var(--status-danger); }
+
+.card-riesgo .card-value { font-size: 20px; }
+.card-riesgo.riesgo-muy-bajo .card-value { color: var(--status-success); }
+.card-riesgo.riesgo-bajo .card-value { color: #7ED957; }
+.card-riesgo.riesgo-neutro .card-value { color: var(--status-warning); }
+.card-riesgo.riesgo-alto .card-value { color: #FF5A3D; }
+.card-riesgo.riesgo-muy-alto .card-value { color: var(--status-danger); }
 
 /* ---------- Esfuerzo percibido (RPE) por actividad ---------- */
 .activity-rpe {
