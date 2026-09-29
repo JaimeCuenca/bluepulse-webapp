@@ -495,84 +495,212 @@ function renderUltimoEntreno(actividades) {
 
 // ---------- Bienestar ----------
 
-/** Busca de forma laxa un valor dentro de un objeto (y un nivel de anidación
- *  hacia dentro) cuya clave contenga alguna de las palabras dadas. Los JSON
- *  crudos de training readiness / training status de Garmin varían de forma
- *  y de nombre de campo según cuenta/reloj, así que en vez de asumir una
- *  forma exacta buscamos por coincidencia de nombre — si no se encuentra
- *  nada, simplemente no se muestra ese dato (no rompe nada). */
-function buscarCampoLaxo(obj, claves, profundidad = 1) {
-  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
-  for (const k of Object.keys(obj)) {
-    if (claves.some((c) => k.toLowerCase().includes(c)) && obj[k] != null && typeof obj[k] !== "object") {
-      return obj[k];
-    }
-  }
-  if (profundidad > 0) {
-    for (const k of Object.keys(obj)) {
-      if (obj[k] && typeof obj[k] === "object") {
-        const encontrado = buscarCampoLaxo(Array.isArray(obj[k]) ? obj[k][0] : obj[k], claves, profundidad - 1);
-        if (encontrado != null) return encontrado;
-      }
-    }
-  }
-  return null;
+// ---------- Riesgo de lesión / descanso: cálculo propio ----------
+// En vez de leer el "training readiness" que calcula cada marca con una
+// fórmula que no controlamos (y que dejó de traerse — ver extract_garmin.py),
+// lo calculamos aquí a partir de datos crudos que cualquier fuente (Garmin
+// hoy, otro dispositivo mañana) puede rellenar igual: sueño, batería al
+// despertar, FC en reposo, y la carga de los entrenos recientes medida con
+// ACWR (Acute:Chronic Workload Ratio — la métrica de carga/lesión más usada
+// en deporte de equipo). Nada de caja negra: siempre se explican los
+// factores que pesan en el resultado.
+const RIESGO_MIN_DIAS_BASELINE = 5; // mínimo de días con dato para fiarse de "tu media"
+const RIESGO_VENTANA_BASELINE = 14; // días previos a hoy para calcular esa media
+const RIESGO_VENTANA_AGUDA = 7; // días para la carga "reciente"
+const RIESGO_VENTANA_CRONICA = 28; // días para la carga "habitual"
+
+function mediaMovil(valores) {
+  const limpios = valores.filter((v) => v != null && !Number.isNaN(v));
+  if (limpios.length < RIESGO_MIN_DIAS_BASELINE) return null;
+  return limpios.reduce((s, v) => s + v, 0) / limpios.length;
 }
 
-/** Extrae del snapshot de wellness más reciente un resumen de "riesgo de
- *  lesión / descanso recomendado" a partir de los JSON crudos de training
- *  readiness y training status que guarda extract_garmin.py. */
-function extraerReadiness(snapshot) {
-  if (!snapshot) return null;
-  let readiness = snapshot.training_readiness_raw;
-  if (Array.isArray(readiness)) readiness = readiness[0];
-  let status = snapshot.training_status_raw;
-  if (Array.isArray(status)) status = status[0];
-  if (!readiness && !status) return null;
-
-  const score = buscarCampoLaxo(readiness, ["score"]);
-  const nivel = buscarCampoLaxo(readiness, ["level"]);
-  const feedback = buscarCampoLaxo(readiness, ["feedbacklong", "feedback"]);
-  const recoveryTime = buscarCampoLaxo(readiness, ["recoverytime"]) ?? buscarCampoLaxo(status, ["recoverytime"]);
-  const acwr = buscarCampoLaxo(readiness, ["acutechronic", "acwr"]);
-  const estadoForma = buscarCampoLaxo(status, ["trainingstatus", "status"]);
-
-  if ([score, nivel, feedback, recoveryTime, estadoForma].every((v) => v == null)) return null;
-  return { score, nivel, feedback, recoveryTime, acwr, estadoForma };
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
 }
 
-function renderReadiness(snapshots) {
+/** No tenemos tu edad ni tu FC máxima real, así que se estima con el valor
+ *  más alto visto en tu propio histórico de actividades (o 190 si todavía
+ *  no hay ninguna con ese dato). */
+function fcMaxEstimada(actividades) {
+  let max = 0;
+  for (const act of actividades) {
+    const m = act.raw_garmin && act.raw_garmin.maxHR;
+    if (m != null && m > max) max = m;
+    if (act.fc_media != null && act.fc_media > max) max = act.fc_media;
+  }
+  return max > 120 ? max : 190;
+}
+
+/** Carga de una actividad para el ACWR: si tiene RPE anotado a mano (escala
+ *  de esfuerzo percibido 1-10), duración × RPE — es el método estándar
+ *  (Foster) y el más fiable porque lo dices tú. Si no lo has anotado, se
+ *  estima con la FC media de la sesión frente a tu FC de reposo de ese día
+ *  y tu FC máxima estimada. Nunca se deja en 0 (sesgaría la media a la
+ *  baja); como último recurso se usa un RPE neutro (5/10). */
+function cargaActividad(act, fcReposoDelDia, fcMax) {
+  if (act.duracion_min == null) return 0;
+  if (act.rpe != null) return act.duracion_min * act.rpe;
+  if (act.fc_media != null && fcReposoDelDia != null && fcMax > fcReposoDelDia) {
+    const intensidad = clamp((act.fc_media - fcReposoDelDia) / (fcMax - fcReposoDelDia), 0, 1);
+    const rpeEstimado = 2 + intensidad * 8; // 0-1 -> 2-10
+    return act.duracion_min * rpeEstimado;
+  }
+  return act.duracion_min * 5;
+}
+
+/** Pinta la caja de "riesgo de lesión y descanso" en Bienestar a partir de
+ *  snapshots de wellness (histórico amplio, no solo lo que se ve en la
+ *  gráfica) y actividades de al menos los últimos RIESGO_VENTANA_CRONICA
+ *  días. */
+function renderRiesgoPropio(snapshots, actividades) {
   const box = document.getElementById("wellness-readiness");
-  const ultimoConDato = [...snapshots].reverse().find((s) => extraerReadiness(s));
-  const r = ultimoConDato ? extraerReadiness(ultimoConDato) : null;
-  if (!r) {
+  box.classList.remove("riesgo-bajo", "riesgo-medio", "riesgo-alto");
+
+  if (!snapshots.length) {
     box.style.display = "none";
     return;
   }
 
-  const items = [];
-  if (r.score != null) items.push(`<span class="wellness-readiness-item">Preparación (readiness): <strong>${r.score}</strong></span>`);
-  if (r.nivel != null) items.push(`<span class="wellness-readiness-item">Nivel: <strong>${r.nivel}</strong></span>`);
-  if (r.estadoForma != null) items.push(`<span class="wellness-readiness-item">Estado de forma: <strong>${r.estadoForma}</strong></span>`);
-  if (r.recoveryTime != null) items.push(`<span class="wellness-readiness-item">Descanso recomendado: <strong>${fmtMinSec(Math.round(r.recoveryTime))}</strong></span>`);
-  if (r.acwr != null) items.push(`<span class="wellness-readiness-item">Carga aguda:crónica: <strong>${r.acwr}</strong></span>`);
+  const hoy = snapshots[snapshots.length - 1];
+  const historicoPrevio = snapshots.slice(0, -1).slice(-RIESGO_VENTANA_BASELINE);
+
+  // ---- Recuperación: hoy vs. tu media de los últimos 14 días ----
+  const mediaSueno = mediaMovil(historicoPrevio.map((s) => s.sueno_horas));
+  const compSueno =
+    mediaSueno != null && hoy.sueno_horas != null ? clamp((hoy.sueno_horas - mediaSueno) / 1.0, -2, 1) : null;
+
+  const mediaBateria = mediaMovil(historicoPrevio.map((s) => s.bateria_corporal_inicio ?? s.bateria_corporal));
+  const bateriaHoy = hoy.bateria_corporal_inicio ?? hoy.bateria_corporal;
+  const compBateria =
+    mediaBateria != null && bateriaHoy != null ? clamp((bateriaHoy - mediaBateria) / 15, -2, 1) : null;
+
+  const mediaFc = mediaMovil(historicoPrevio.map((s) => s.fc_reposo));
+  const compFc = mediaFc != null && hoy.fc_reposo != null ? clamp(-(hoy.fc_reposo - mediaFc) / 4, -2, 1) : null;
+
+  // ---- Carga de entreno: ACWR (carga de los últimos 7 días / media semanal de los últimos 28) ----
+  const fcMax = fcMaxEstimada(actividades);
+  const snapshotPorFecha = {};
+  snapshots.forEach((s) => (snapshotPorFecha[s.fecha] = s));
+  const hoyFecha = new Date(hoy.fecha + "T00:00:00");
+  const diasDesdeHoy = (fechaStr) => Math.round((hoyFecha - new Date(fechaStr + "T00:00:00")) / 86400000);
+
+  let cargaAguda = 0;
+  let cargaCronica = 0;
+  const diasConEntreno = new Set();
+  for (const act of actividades) {
+    if (!act.fecha || act.duracion_min == null) continue;
+    const dias = diasDesdeHoy(act.fecha);
+    if (dias < 0 || dias >= RIESGO_VENTANA_CRONICA) continue;
+    const fcReposoDelDia = snapshotPorFecha[act.fecha] && snapshotPorFecha[act.fecha].fc_reposo;
+    const carga = cargaActividad(act, fcReposoDelDia ?? mediaFc, fcMax);
+    cargaCronica += carga;
+    diasConEntreno.add(act.fecha);
+    if (dias < RIESGO_VENTANA_AGUDA) cargaAguda += carga;
+  }
+  // Con menos de ~4 días distintos de entreno en 28 días el ACWR no dice nada fiable.
+  let compAcwr = null;
+  let acwr = null;
+  if (diasConEntreno.size >= 4 && cargaCronica > 0) {
+    const cargaCronicaSemanal = cargaCronica / (RIESGO_VENTANA_CRONICA / 7);
+    acwr = cargaCronicaSemanal > 0 ? cargaAguda / cargaCronicaSemanal : null;
+    if (acwr != null) {
+      if (acwr > 1.3) compAcwr = clamp(-(acwr - 1.3) / 0.3, -2, 0);
+      else if (acwr < 0.8) compAcwr = clamp((-(0.8 - acwr) / 0.8) * 0.5, -1, 0);
+      else compAcwr = 0.3; // zona recomendada 0.8-1.3
+    }
+  }
+
+  const componentes = [
+    {
+      nombre: "sueño",
+      valor: compSueno,
+      detalle:
+        mediaSueno != null && hoy.sueno_horas != null
+          ? `${fmtMinSec(Math.round(hoy.sueno_horas * 60))} anoche vs. ${fmtMinSec(Math.round(mediaSueno * 60))} de media`
+          : null,
+    },
+    {
+      nombre: "batería al despertar",
+      valor: compBateria,
+      detalle:
+        mediaBateria != null && bateriaHoy != null
+          ? `${Math.round(bateriaHoy)}% hoy vs. ${Math.round(mediaBateria)}% de media`
+          : null,
+    },
+    {
+      nombre: "FC en reposo",
+      valor: compFc,
+      detalle:
+        mediaFc != null && hoy.fc_reposo != null
+          ? `${Math.round(hoy.fc_reposo)} ppm hoy vs. ${Math.round(mediaFc)} ppm de media`
+          : null,
+    },
+    {
+      nombre: "carga de entreno (ACWR)",
+      valor: compAcwr,
+      detalle: acwr != null ? `${acwr.toFixed(2)} (zona recomendada: 0.8-1.3)` : null,
+    },
+  ].filter((c) => c.valor != null);
+
+  if (!componentes.length) {
+    box.innerHTML = `
+      <span class="wellness-readiness-titulo">🩺 Riesgo de lesión y descanso</span>
+      <span class="wellness-readiness-item">Todavía no hay suficiente histórico (hacen falta ~2 semanas de sueño/batería/FC y varios entrenos) para calcular esto de forma fiable.</span>
+    `;
+    box.style.display = "flex";
+    return;
+  }
+
+  const suma = componentes.reduce((s, c) => s + c.valor, 0);
+  const score = clamp(Math.round(50 + 12.5 * suma), 0, 100);
+  const nivel = score >= 70 ? "bajo" : score >= 40 ? "medio" : "alto";
+  const nivelTexto = { bajo: "Riesgo bajo", medio: "Riesgo moderado", alto: "Riesgo elevado" }[nivel];
+  box.classList.add(`riesgo-${nivel}`);
+
+  const factoresNegativos = componentes.filter((c) => c.valor < -0.3).sort((a, b) => a.valor - b.valor);
+  const explicacion = factoresNegativos.length
+    ? `Pesan en contra: ${factoresNegativos.map((c) => c.nombre).join(", ")}.`
+    : "Ningún factor destaca especialmente hoy.";
+
+  const detalles = componentes
+    .filter((c) => c.detalle)
+    .map(
+      (c) =>
+        `<span class="wellness-readiness-item">${c.nombre[0].toUpperCase() + c.nombre.slice(1)}: ${c.detalle}</span>`
+    )
+    .join("");
 
   box.innerHTML = `
-    <span class="wellness-readiness-titulo">🩺 Riesgo de lesión y descanso (según Garmin)</span>
-    ${items.join("")}
-    ${r.feedback ? `<span class="wellness-readiness-item">${r.feedback}</span>` : ""}
-    <span class="wellness-readiness-origen">Según los datos de preparación / estado de forma del ${ultimoConDato.fecha}. Garmin no recalcula esto todos los días.</span>
+    <span class="wellness-readiness-titulo">🩺 ${nivelTexto} <span class="wellness-readiness-score">(${score}/100)</span></span>
+    <span class="wellness-readiness-item">${explicacion}</span>
+    ${detalles}
+    <span class="wellness-readiness-origen">Cálculo propio a partir de tu sueño, batería, FC en reposo y carga de entreno (con RPE si lo anotas en cada actividad) — no es lo que calcula Garmin, así que puede no coincidir con su app. Con poco histórico, tómalo con cautela.</span>
   `;
   box.style.display = "flex";
 }
 
 async function loadWellness() {
-  const days = document.getElementById("wellness-days").value || 30;
-  const data = await apiGet(`/api/wellness?days=${days}`);
-  const snapshots = data.snapshots || [];
+  const days = parseInt(document.getElementById("wellness-days").value, 10) || 30;
+  // El cálculo de riesgo necesita ~35 días de histórico (ventana crónica de
+  // 28 + margen para la media móvil) aunque el desplegable de la gráfica
+  // pida menos, así que se pide siempre lo que sea mayor y se recorta luego
+  // solo lo que se pinta en las gráficas.
+  const DIAS_HISTORICO_RIESGO = 35;
+  const diasFetch = Math.max(days, DIAS_HISTORICO_RIESGO);
+  const data = await apiGet(`/api/wellness?days=${diasFetch}`);
+  const snapshotsTodos = data.snapshots || [];
+  const snapshots = snapshotsTodos.slice(-days);
 
   document.getElementById("wellness-empty").style.display = snapshots.length ? "none" : "block";
-  renderReadiness(snapshots);
+
+  const desdeRiesgo = new Date();
+  desdeRiesgo.setDate(desdeRiesgo.getDate() - DIAS_HISTORICO_RIESGO);
+  const garminRiesgo = await apiGet(
+    `/api/garmin?tipo=todos&limit=200&desde=${desdeRiesgo.toISOString().slice(0, 10)}`
+  ).catch(() => null);
+  renderRiesgoPropio(snapshotsTodos, (garminRiesgo && garminRiesgo.activities) || []);
+
   if (!snapshots.length) return;
 
   const labels = snapshots.map((s) => s.fecha);
@@ -838,7 +966,27 @@ function renderActivityDetail(act) {
     `;
   }
 
-  return `<div class="activity-stats-grid">${statsHtml}</div>${ejerciciosHtml}${extraHtml}`;
+  // Esfuerzo percibido (RPE, 1-10): lo anotas tú a mano y alimenta el
+  // cálculo propio de carga de entreno (ACWR) de la caja de riesgo de
+  // lesión en Bienestar — con esto es más fiable que estimarlo solo con la
+  // FC media de la sesión.
+  const rpeHtml = renderRpeSelector(act);
+
+  return `<div class="activity-stats-grid">${statsHtml}</div>${ejerciciosHtml}${extraHtml}${rpeHtml}`;
+}
+
+function renderRpeSelector(act) {
+  const valorActual = act.rpe ?? null;
+  const botones = Array.from({ length: 10 }, (_, i) => i + 1)
+    .map((n) => `<button type="button" class="rpe-btn${valorActual === n ? " selected" : ""}" data-rpe="${n}">${n}</button>`)
+    .join("");
+  const etiqueta = valorActual != null ? `guardado: ${valorActual}/10` : "sin anotar — para el cálculo de carga";
+  return `
+    <div class="activity-rpe">
+      <p class="activity-detail-section-titulo activity-rpe-titulo">Esfuerzo percibido (RPE) — ${etiqueta}</p>
+      <div class="rpe-selector">${botones}</div>
+    </div>
+  `;
 }
 
 /** Construye el elemento <div class="activity-item"> plegable/desplegable
@@ -875,6 +1023,39 @@ function crearActivityItem(act) {
           const visible = extra.style.display !== "none";
           extra.style.display = visible ? "none" : "block";
           verMasBtn.textContent = visible ? "Ver más datos ▾" : "Ocultar datos ▲";
+        });
+      }
+      const rpeSelector = detail.querySelector(".rpe-selector");
+      const rpeTitulo = detail.querySelector(".activity-rpe-titulo");
+      if (rpeSelector) {
+        rpeSelector.querySelectorAll(".rpe-btn").forEach((btn) => {
+          btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const rpe = parseInt(btn.dataset.rpe, 10);
+            rpeSelector.querySelectorAll(".rpe-btn").forEach((b) => b.classList.remove("selected"));
+            btn.classList.add("selected");
+            if (rpeTitulo) rpeTitulo.textContent = `Esfuerzo percibido (RPE) — guardando...`;
+            try {
+              const res = await conAuth(() =>
+                fetch("/api/garmin", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ fecha: act.fecha, id: act.id, rpe }),
+                })
+              );
+              const data = await res.json().catch(() => ({}));
+              if (data.ok) {
+                act.rpe = rpe; // refleja en el objeto en memoria (afecta al próximo cálculo de riesgo)
+                if (rpeTitulo) rpeTitulo.textContent = `Esfuerzo percibido (RPE) — guardado: ${rpe}/10`;
+              } else {
+                if (rpeTitulo) rpeTitulo.textContent = `Esfuerzo percibido (RPE) — sin anotar — para el cálculo de carga`;
+                mostrarToast(`Error al guardar el RPE: ${data.error || "desconocido"}`, { id: "rpe" });
+              }
+            } catch (err) {
+              if (rpeTitulo) rpeTitulo.textContent = `Esfuerzo percibido (RPE) — sin anotar — para el cálculo de carga`;
+              mostrarToast("Error de red al guardar el RPE.", { id: "rpe" });
+            }
+          });
         });
       }
     }

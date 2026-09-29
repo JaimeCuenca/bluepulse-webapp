@@ -1,4 +1,4 @@
-import { listDir, readJson } from "../_lib/github.js";
+import { listDir, readJson, writeJson, isAuthed } from "../_lib/github.js";
 
 // GET /api/garmin?tipo=running|fuerza|todos&limit=20&desde=YYYY-MM-DD
 // "desde" es opcional (rango de fechas, p.ej. "esta semana" desde la webapp).
@@ -31,5 +31,46 @@ export async function onRequestGet({ request, env }) {
 
   return new Response(JSON.stringify({ ok: true, activities }), {
     headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+  });
+}
+
+// POST /api/garmin { fecha, id, rpe } -> anota el esfuerzo percibido (1-10)
+// de una actividad ya sincronizada. Requiere sesión (misma contraseña que
+// añadir partidos/lanzar el sync). El RPE alimenta el cálculo propio de
+// carga de entreno (ACWR) que hace la webapp para el riesgo de lesión.
+export async function onRequestPost({ request, env }) {
+  if (!isAuthed(request, env)) {
+    return new Response(JSON.stringify({ ok: false, error: "No autenticado" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const body = await request.json().catch(() => null);
+  const fecha = body && body.fecha;
+  const id = body && body.id;
+  const rpe = body && Number(body.rpe);
+
+  if (!fecha || id == null || !Number.isInteger(rpe) || rpe < 1 || rpe > 10) {
+    return new Response(
+      JSON.stringify({ ok: false, error: "Faltan o son inválidos los campos: fecha, id, rpe (entero 1-10)" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  const path = `garmin/activities/${fecha}_${id}.json`;
+  const existing = await readJson(env, path);
+  if (!existing) {
+    return new Response(JSON.stringify({ ok: false, error: "Actividad no encontrada" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const actualizado = { ...existing.json, rpe };
+  await writeJson(env, path, actualizado, `RPE ${rpe}/10 para actividad ${id} (${fecha})`, existing.sha);
+
+  return new Response(JSON.stringify({ ok: true }), {
+    headers: { "Content-Type": "application/json" },
   });
 }
