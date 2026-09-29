@@ -845,9 +845,6 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
 .fab-sub-btn:active { transform: scale(0.92); }
 .fab-sub-btn svg { width: 20px; height: 20px; }
 .fab-sub-btn.sync-garmin { color: var(--accent-garmin); }
-.fab-sub-btn.sync-device { color: var(--status-success); }
-.fab-sub-btn.sync-db { color: var(--accent-blue); }
-.fab-sub-btn.sync-all { color: var(--accent-blue-glow); }
 .fab-sub-btn .lucide-loader-circle,
 .fab-sub-btn.spinning svg { animation: fabSpin 1.2s linear infinite; }
 @keyframes fabSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

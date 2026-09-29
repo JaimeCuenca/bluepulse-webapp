@@ -1038,22 +1038,13 @@ fabBackdrop.addEventListener("click", cerrarFab);
 
 document.getElementById("fab-sync-garmin").addEventListener("click", () => {
   cerrarFab();
-  iniciarSync("Garmin Connect");
+  iniciarSync("Garmin");
 });
-document.getElementById("fab-sync-all").addEventListener("click", () => {
-  cerrarFab();
-  // De momento la única fuente real es Garmin; en cuanto haya más (Arduino,
-  // otra marca...) "Sincronizar todo" las lanzará todas desde aquí.
-  iniciarSync("todas las fuentes");
-});
-document.getElementById("fab-sync-device").addEventListener("click", () => {
-  cerrarFab();
-  mostrarToast("Próximamente: aún no hay ningún dispositivo Arduino/BLE conectado.", { id: "sync" });
-});
-document.getElementById("fab-sync-db").addEventListener("click", () => {
-  cerrarFab();
-  mostrarToast("Próximamente: la importación de BBDD/CSV todavía no está disponible.", { id: "sync" });
-});
+// Nota: de momento solo hay una fuente (Garmin). Cuando se conecte el
+// dispositivo Arduino/BLE u otra marca, aquí se añaden más <div class="fab-option">
+// en el HTML (con su icono y color) y su listener correspondiente — el
+// backdrop, la animación en cascada y conAuth/iniciarSync ya están listos
+// para varias opciones.
 
 // ---------- Partidos ----------
 let partidosActuales = []; // último dataset cargado (ya con _temporada añadido)
