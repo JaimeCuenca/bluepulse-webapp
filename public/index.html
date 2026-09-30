@@ -66,10 +66,16 @@
 
       <h3 class="resumen-subtitulo resumen-subtitulo-primera resumen-subtitulo-link" data-ir-a-tab="wellness">Bienestar</h3>
       <div class="cards" id="resumen-cards-salud">
-        <div class="card card-clicable" id="rc-battery-card" data-ir-a-tab="wellness"><span class="card-label">Batería corporal (hoy)</span><span class="card-value" id="rc-battery"><span class="skeleton"></span></span><span class="card-ver-mas">Ver evolución del día →</span></div>
-        <div class="card"><span class="card-label">Sueño (última noche)</span><span class="card-value" id="rc-sleep"><span class="skeleton"></span></span></div>
+        <div class="card card-clicable" id="rc-battery-card" data-ir-a-tab="wellness">
+          <div class="card-label-row"><span class="card-label">Batería corporal (hoy)</span><span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Nivel de energía corporal de Garmin, medido desde que te despiertas hasta que te acuestas (no desde medianoche).</span></span></div>
+          <span class="card-value" id="rc-battery"><span class="skeleton"></span></span><span class="card-ver-mas">Ver evolución del día →</span>
+        </div>
+        <div class="card">
+          <div class="card-label-row"><span class="card-label">Sueño (última noche)</span><span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Horas totales de sueño registradas por el reloj la noche anterior.</span></span></div>
+          <span class="card-value" id="rc-sleep"><span class="skeleton"></span></span>
+        </div>
         <div class="card card-kcal card-clicable" id="rc-kcal-card" data-ir-a-tab="wellness">
-          <span class="card-label">Calorías (hoy)</span>
+          <div class="card-label-row"><span class="card-label">Calorías (hoy)</span><span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Total de hoy = activas (quemadas por movimiento/entreno) + pasivas (tu metabolismo basal).</span></span></div>
           <span class="card-value" id="rc-kcal-total"><span class="skeleton"></span></span>
           <div class="card-subvalues">
             <span class="card-subvalue">Activas <strong id="rc-kcal-activas">—</strong></span>
@@ -78,7 +84,7 @@
           <span class="card-ver-mas">Ver por día →</span>
         </div>
         <div class="card">
-          <span class="card-label">VO2 Max (ml/kg/min)</span>
+          <div class="card-label-row"><span class="card-label">VO2 Max (ml/kg/min)</span><span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Capacidad aeróbica estimada por Garmin. FC reposo: pulsaciones en reposo — cuanto más baja, mejor suele ser tu forma cardiovascular.</span></span></div>
           <span class="card-value" id="rc-vo2max"><span class="skeleton"></span></span>
           <div class="card-subvalues">
             <span class="card-subvalue">FC reposo <strong id="rc-fc-reposo">—</strong></span>
@@ -86,12 +92,15 @@
           <span class="card-origen" id="rc-vo2max-origen"></span>
         </div>
         <div class="card card-clicable card-riesgo" id="rc-riesgo-card" data-ir-a-tab="wellness">
-          <span class="card-label">Riesgo de lesión</span>
+          <div class="card-label-row"><span class="card-label">Riesgo de lesión</span><span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Puntuación 0-100 a partir de tu sueño, batería corporal y FC en reposo (vs. tu media reciente) y la carga de entreno de los últimos días (ACWR). Toca la tarjeta para ver el desglose completo.</span></span></div>
           <span class="card-value" id="rc-riesgo"><span class="skeleton"></span></span>
           <span class="card-ver-mas">Ver desglose →</span>
         </div>
       </div>
-      <p class="hint" id="rc-sync-hint"></p>
+      <div class="sync-status-row">
+        <span class="hint" id="rc-sync-hint"></span>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Si un dato no coincide con lo que marca el reloj, suele ser porque Garmin Connect (la nube) aún no lo ha recibido del teléfono: abre la app de Garmin Connect para forzar el envío y vuelve a sincronizar aquí.</span></span>
+      </div>
 
       <h3 class="resumen-subtitulo resumen-subtitulo-link" data-ir-a-tab="partidos">Performance</h3>
       <div class="cards" id="resumen-cards-performance">
@@ -105,6 +114,10 @@
       </div>
 
       <h3 class="resumen-subtitulo resumen-subtitulo-link" data-ir-a-tab="garmin">Entrenos</h3>
+      <div class="metric-header">
+        <p class="metric-header-title">Carga muscular reciente</p>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Qué grupos musculares han trabajado más en tus últimos entrenos, según el tipo de actividad sincronizada.</span></span>
+      </div>
       <div class="muscular-diagrama">
         <div class="muscular-figura">
           <div id="muscular-front"></div>
@@ -120,7 +133,7 @@
 
       <div class="cards" id="resumen-cards-carga">
         <div class="card card-efecto">
-          <span class="card-label">Efecto de entreno (último)</span>
+          <div class="card-label-row"><span class="card-label">Efecto de entreno (último)</span><span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Impacto aeróbico y anaeróbico estimado por Garmin del último entreno registrado, en una escala de 0 a 5.</span></span></div>
           <div class="efecto-valores">
             <div class="efecto-item"><span class="efecto-valor" id="rc-efecto-aerobico">—</span><span class="efecto-tipo">Aeróbico</span></div>
             <div class="efecto-item"><span class="efecto-valor" id="rc-efecto-anaerobico">—</span><span class="efecto-tipo">Anaeróbico</span></div>
@@ -136,7 +149,6 @@
 
     <section id="tab-wellness" class="tab-panel">
       <h2>Bienestar</h2>
-      <p class="hint">Sueño, batería corporal y calorías.</p>
       <div class="filters">
         <label>Últimos días: <input type="number" id="wellness-days" value="5" min="1" max="180" /></label>
         <button id="wellness-reload">Actualizar</button>
@@ -144,12 +156,22 @@
 
       <div id="wellness-readiness" class="wellness-readiness" style="display:none;"></div>
 
-      <p class="hint">Batería corporal: desde que te despiertas hasta que te acuestas (no desde medianoche).</p>
+      <div class="metric-header">
+        <p class="metric-header-title">Batería corporal</p>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Desde que te despiertas hasta que te acuestas (no desde medianoche), según el sensor de Garmin.</span></span>
+      </div>
       <div class="chart-container"><canvas id="chart-battery"></canvas></div>
 
-      <p class="hint">Calorías quemadas por día: totales, activas y pasivas.</p>
+      <div class="metric-header">
+        <p class="metric-header-title">Calorías por día</p>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Totales, activas (movimiento/entreno) y pasivas (metabolismo basal), por día.</span></span>
+      </div>
       <div class="chart-container"><canvas id="chart-kcal"></canvas></div>
 
+      <div class="metric-header">
+        <p class="metric-header-title">Sueño</p>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Horas de sueño por noche, según el registro de tu reloj.</span></span>
+      </div>
       <div class="chart-container"><canvas id="chart-sleep"></canvas></div>
       <div id="wellness-empty" class="empty-state" style="display:none;">
         Todavía no hay datos sincronizados de Garmin. En cuanto corra el script de extracción (GitHub Action diaria), esta sección se rellenará sola.
@@ -157,8 +179,10 @@
     </section>
 
     <section id="tab-garmin" class="tab-panel">
-      <h2>Entrenos</h2>
-      <p class="hint">Actividades sincronizadas desde Garmin Connect.</p>
+      <div class="metric-header">
+        <h2 style="margin:0;">Entrenos</h2>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Actividades sincronizadas desde Garmin Connect. Para sincronizar, usa el botón ⟳ flotante de abajo a la derecha. Para futsal (u otro entreno que no puedas medir con el reloj), añádelo a mano con el botón de abajo.</span></span>
+      </div>
       <div class="filters">
         <label>Periodo:
           <select id="garmin-rango">
@@ -179,16 +203,21 @@
         <button id="garmin-reload">Actualizar</button>
         <button id="entreno-manual-nuevo-btn">+ Añadir entreno manual</button>
       </div>
-      <p class="hint">Para sincronizar con Garmin, usa el botón ⟳ flotante de abajo a la derecha. Para futsal (u otro entreno que no puedas medir con el reloj), añádelo a mano.</p>
 
       <div class="chart-container-wide treemap-wide" id="garmin-distribucion-container">
-        <p class="resumen-subtitulo-menor" style="margin-top:0;">Distribución de entrenos por tipo (minutos)</p>
+        <div class="metric-header">
+          <p class="metric-header-title">Distribución por tipo</p>
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Cada rectángulo es un tipo de entreno; su tamaño es proporcional a los minutos totales en el periodo filtrado. El color es fijo por tipo.</span></span>
+        </div>
         <div id="treemap-tipos-entreno" class="treemap"></div>
       </div>
 
       <div class="chart-container-wide" id="garmin-calendario-container">
         <div class="chart-header-row">
-          <p class="resumen-subtitulo-menor" style="margin:0;">Calendario de entrenos</p>
+          <div class="metric-header" style="margin-bottom:0;">
+            <p class="metric-header-title">Calendario de entrenos</p>
+            <span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Un cuadrado por día; cuanto más intenso el azul, más minutos entrenaste ese día. Toca un día para ver el detalle. No depende del filtro de periodo de arriba.</span></span>
+          </div>
           <select id="calendario-meses">
             <option value="3" selected>Últimos 3 meses</option>
             <option value="6">Últimos 6 meses</option>
@@ -218,7 +247,6 @@
 
     <section id="tab-partidos" class="tab-panel">
       <h2>Performance</h2>
-      <p class="hint">Partidos, goles y estadísticas.</p>
       <div class="filters">
         <label>Temporada:
           <select id="partidos-temporada">
@@ -247,11 +275,20 @@
         <div class="card"><span class="card-label">Partidos</span><span class="card-value" id="pc-num"><span class="skeleton"></span></span></div>
         <div class="card"><span class="card-label">Minutos jugados</span><span class="card-value" id="pc-min"><span class="skeleton"></span></span></div>
         <div class="card"><span class="card-label">Goles encajados</span><span class="card-value" id="pc-goles"><span class="skeleton"></span></span></div>
-        <div class="card"><span class="card-label">Goles/partido</span><span class="card-value" id="pc-goles-partido"><span class="skeleton"></span></span></div>
-        <div class="card"><span class="card-label">Goles/40min</span><span class="card-value" id="pc-ratio"><span class="skeleton"></span></span></div>
+        <div class="card">
+          <div class="card-label-row"><span class="card-label">Goles/partido</span><span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Goles encajados ÷ partidos jugados, en los filtros seleccionados.</span></span></div>
+          <span class="card-value" id="pc-goles-partido"><span class="skeleton"></span></span>
+        </div>
+        <div class="card">
+          <div class="card-label-row"><span class="card-label">Goles/40min</span><span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Goles encajados normalizados a un partido completo (40 min), para comparar partidos con distintos minutos jugados.</span></span></div>
+          <span class="card-value" id="pc-ratio"><span class="skeleton"></span></span>
+        </div>
       </div>
 
-      <h4 class="resumen-subtitulo-menor">Goles encajados por tipo</h4>
+      <div class="metric-header">
+        <h4 class="resumen-subtitulo-menor" style="margin:0;">Goles encajados por tipo</h4>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover"><strong>Error:</strong> fallo evitable propio. <strong>Dudoso:</strong> no está claro si se podía evitar. <strong>Nada que hacer:</strong> disparo o jugada imposible de parar. Los porcentajes se calculan sobre el total de goles y sobre el total de partidos.</span></span>
+      </div>
       <div class="cards" id="partidos-cards-tipo">
         <div class="card card-tipo-gol" data-tipo="error">
           <span class="card-label">Error</span>
@@ -282,10 +319,22 @@
         </div>
       </div>
 
+      <div class="metric-header">
+        <p class="metric-header-title">Tipos de gol encajado</p>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Reparto de los goles encajados en los partidos filtrados, por tipo (error/dudoso/nada que hacer).</span></span>
+      </div>
       <div class="chart-container"><canvas id="chart-tipos-gol"></canvas></div>
 
+      <div class="metric-header">
+        <p class="metric-header-title">Goles por partido</p>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Goles encajados en cada partido, por tipo, en orden cronológico.</span></span>
+      </div>
       <div class="chart-container"><canvas id="chart-goles-partido"></canvas></div>
 
+      <div class="metric-header">
+        <p class="metric-header-title">Motivos del error</p>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">Qué solía fallar en los goles marcados como "error", según lo que anotaste en cada uno al registrarlo.</span></span>
+      </div>
       <div id="chart-motivos-container" class="chart-container">
         <canvas id="chart-motivos-error"></canvas>
         <p class="hint" id="chart-motivos-empty" style="display:none;">Todavía no hay goles de tipo "error" con un análisis anotado.</p>

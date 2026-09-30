@@ -102,7 +102,10 @@ tabButtons.forEach((btn) => {
 // Subtítulos-enlace del Resumen: "Bienestar" -> pestaña wellness,
 // "Entrenos" -> pestaña garmin, "Performance" -> pestaña partidos.
 document.querySelectorAll("[data-ir-a-tab]").forEach((el) => {
-  el.addEventListener("click", () => irATab(el.dataset.irATab));
+  el.addEventListener("click", (e) => {
+    if (e.target.closest(".info-wrap")) return;
+    irATab(el.dataset.irATab);
+  });
 });
 
 // ---------- Helpers ----------
@@ -129,6 +132,47 @@ function fmtMinSec(totalMin) {
   const m = Math.round(totalMin % 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
+
+// ---------- Popovers de info ("i") ----------
+// En vez de párrafos de texto siempre visibles explicando qué mide o cómo
+// se calcula cada métrica, un botón "i" junto al título despliega esa
+// explicación en un popover al pasar el ratón (desktop) o al tocarlo
+// (móvil); un solo listener delegado sirve para todos, incluidos los que
+// se generan dinámicamente más tarde (tarjetas, gráficas, etc.).
+function infoWrapHTML(texto) {
+  return `<span class="info-wrap"><button type="button" class="info-btn" aria-label="Más información">i</button><span class="info-popover">${texto}</span></span>`;
+}
+// El popover se ancla por defecto a la derecha del icono ("i"); para los
+// que están cerca del borde izquierdo de la pantalla eso lo saca fuera de
+// la ventana, así que aquí se comprueba (al abrir) si se saldría y, si es
+// así, se ancla a la izquierda en su lugar.
+function ajustarPosicionPopover(wrap) {
+  const pop = wrap.querySelector(".info-popover");
+  if (!pop) return;
+  pop.classList.remove("align-left");
+  const wrapRect = wrap.getBoundingClientRect();
+  const popWidth = pop.offsetWidth || 260;
+  if (wrapRect.right - popWidth < 0) pop.classList.add("align-left");
+}
+document.addEventListener("mouseover", (e) => {
+  const wrap = e.target.closest(".info-wrap");
+  if (wrap) ajustarPosicionPopover(wrap);
+});
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".info-btn");
+  document.querySelectorAll(".info-wrap.open").forEach((w) => {
+    if (!btn || w !== btn.closest(".info-wrap")) w.classList.remove("open");
+  });
+  if (btn) {
+    e.stopPropagation();
+    const wrap = btn.closest(".info-wrap");
+    ajustarPosicionPopover(wrap);
+    wrap.classList.toggle("open");
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") document.querySelectorAll(".info-wrap.open").forEach((w) => w.classList.remove("open"));
+});
 
 let chartBattery, chartSleep, chartKcal, chartGoles, chartMotivos, chartGolesPorPartido;
 
@@ -189,14 +233,13 @@ async function loadResumen() {
   kcalActivasEl.textContent = last.kcal_activas != null ? Math.round(last.kcal_activas) + " kcal" : "—";
   kcalPasivasEl.textContent = last.kcal_pasivas != null ? Math.round(last.kcal_pasivas) + " kcal" : "—";
 
-  // Pista de cuándo se sincronizó Garmin de verdad por última vez: si el
-  // "Body Battery" u otro dato no cuadra con lo que marca el reloj, suele ser
-  // porque Garmin Connect (la nube) todavía no ha recibido ese dato del
-  // teléfono, no porque BluePulse esté leyendo algo viejo.
+  // Pista de cuándo se sincronizó Garmin de verdad por última vez (el porqué,
+  // si un dato no cuadra con el reloj, vive en el icono "i" de al lado, no
+  // aquí — este texto se queda solo con el dato en sí).
   const syncHint = document.getElementById("rc-sync-hint");
   if (wellness && wellness.last_sync && wellness.last_sync.sincronizado_en) {
     const fecha = new Date(wellness.last_sync.sincronizado_en + "Z");
-    syncHint.textContent = `Última sincronización con Garmin: ${fecha.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}. Si un dato no coincide con el reloj, suele ser porque Garmin Connect (la nube) aún no lo ha recibido del teléfono — abre la app de Garmin Connect para forzar el envío y vuelve a sincronizar aquí.`;
+    syncHint.textContent = `Sincronizado: ${fecha.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}`;
   } else {
     syncHint.textContent = "";
   }
@@ -711,6 +754,9 @@ function calcularRiesgo(snapshots, actividades) {
 
 const CLASES_NIVEL_RIESGO = ["riesgo-muy-alto", "riesgo-alto", "riesgo-neutro", "riesgo-bajo", "riesgo-muy-bajo"];
 
+const TEXTO_INFO_RIESGO =
+  "Cálculo propio a partir de tu sueño, batería, FC en reposo y carga de entreno (con RPE si lo anotas en cada actividad) — no es lo que calcula Garmin, así que puede no coincidir con su app. Con poco histórico, tómalo con cautela.";
+
 /** Pinta la caja detallada de "riesgo de lesión y descanso" en Bienestar
  *  (score + qué factores pesan + el detalle de cada uno). */
 function renderRiesgoPropio(snapshots, actividades) {
@@ -725,7 +771,7 @@ function renderRiesgoPropio(snapshots, actividades) {
 
   if (!riesgo.suficiente) {
     box.innerHTML = `
-      <span class="wellness-readiness-titulo">Riesgo de lesión y descanso</span>
+      <span class="wellness-readiness-titulo-row"><span class="wellness-readiness-titulo">Riesgo de lesión y descanso</span>${infoWrapHTML(TEXTO_INFO_RIESGO)}</span>
       <span class="wellness-readiness-item">Todavía no hay suficiente histórico (hacen falta ~2 semanas de sueño/batería/FC y varios entrenos) para calcular esto de forma fiable.</span>
     `;
     box.style.display = "flex";
@@ -748,10 +794,9 @@ function renderRiesgoPropio(snapshots, actividades) {
     .join("");
 
   box.innerHTML = `
-    <span class="wellness-readiness-titulo">${nivelTexto} <span class="wellness-readiness-score">(${score}/100)</span></span>
+    <span class="wellness-readiness-titulo-row"><span class="wellness-readiness-titulo">${nivelTexto} <span class="wellness-readiness-score">(${score}/100)</span></span>${infoWrapHTML(TEXTO_INFO_RIESGO)}</span>
     <span class="wellness-readiness-item">${explicacion}</span>
     ${detalles}
-    <span class="wellness-readiness-origen">Cálculo propio a partir de tu sueño, batería, FC en reposo y carga de entreno (con RPE si lo anotas en cada actividad) — no es lo que calcula Garmin, así que puede no coincidir con su app. Con poco histórico, tómalo con cautela.</span>
   `;
   box.style.display = "flex";
 }
@@ -838,7 +883,6 @@ async function loadWellness() {
     options: {
       maintainAspectRatio: false,
       plugins: {
-        title: { display: true, text: "Batería corporal (al despertar → al acostarte)" },
         legend: { display: false },
         tooltip: {
           callbacks: {
@@ -879,7 +923,6 @@ async function loadWellness() {
     },
     options: {
       maintainAspectRatio: false,
-      plugins: { title: { display: true, text: "Calorías por día" } },
     },
   });
 
@@ -889,7 +932,6 @@ async function loadWellness() {
     data: { labels, datasets: [{ label: "Horas de sueño", data: sleep, backgroundColor: "#00C4B3" }] },
     options: {
       maintainAspectRatio: false,
-      plugins: { title: { display: true, text: "Sueño" } },
     },
   });
 }
@@ -1784,7 +1826,6 @@ function renderGolesPorPartido(partidosOrdenados) {
       data: { labels, datasets },
       options: {
         maintainAspectRatio: false,
-        plugins: { title: { display: true, text: "Goles encajados por partido (cronológico)" } },
         scales: {
           x: { stacked: true, ticks: { autoSkip: true, maxRotation: 60, minRotation: 0 } },
           y: { stacked: true, ticks: { precision: 0 } },
@@ -1859,7 +1900,7 @@ function renderPartidos() {
         labels: tipos.map(tipoLabel),
         datasets: [{ data: tipos.map((t) => tipoCount[t]), backgroundColor: tipos.map(tipoColor) }],
       },
-      options: { maintainAspectRatio: false, plugins: { title: { display: true, text: "Tipos de gol encajado" } } },
+      options: { maintainAspectRatio: false },
     });
   } catch (e) {
     console.error("No se pudo dibujar el gráfico de tipos de gol:", e);
@@ -1896,7 +1937,7 @@ function renderPartidos() {
         options: {
           maintainAspectRatio: false,
           indexAxis: "y",
-          plugins: { title: { display: true, text: "Motivos de los goles por error" }, legend: { display: false } },
+          plugins: { legend: { display: false } },
           scales: { x: { ticks: { precision: 0 } } },
         },
       });

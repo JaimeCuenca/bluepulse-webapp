@@ -251,6 +251,12 @@ main { padding: var(--space-lg); max-width: 1000px; margin: 0 auto; }
   box-shadow: var(--glow-blue);
 }
 
+.card-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
 .card-label {
   font-family: var(--font-body);
   font-weight: 600;
@@ -258,6 +264,93 @@ main { padding: var(--space-lg); max-width: 1000px; margin: 0 auto; }
   letter-spacing: 1.2px;
   text-transform: uppercase;
   color: var(--text-secondary);
+}
+
+/* ---------- Info (i): qué mide una métrica y cómo se calcula ----------
+   En vez de párrafos de texto siempre visibles junto a cada gráfica o
+   tarjeta, un botoncito "i" que en hover (ratón) o al tocarlo (móvil)
+   despliega la explicación en un popover, y se cierra solo al tocar fuera. */
+.info-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.info-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface-elevated);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.info-btn:hover,
+.info-btn:focus-visible {
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+}
+.info-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: max-content;
+  max-width: min(260px, 80vw);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-secondary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.info-wrap:hover .info-popover,
+.info-wrap.open .info-popover {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+/* Para icones cerca del borde izquierdo de la pantalla, donde anclar el
+   popover a la derecha (comportamiento por defecto) lo saca fuera de la
+   ventana; ajustarPosicionPopovers() en app.js añade esta clase cuando
+   detecta que se saldría. */
+.info-popover.align-left {
+  right: auto;
+  left: 0;
+}
+
+/* Cabecera "título + i" para gráficas que antes llevaban un párrafo de
+   explicación fijo al lado, o un título dibujado dentro del propio canvas. */
+.metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+.metric-header-title {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin: 0;
 }
 .card-value {
   font-family: var(--font-heading);
@@ -388,6 +481,8 @@ button#login-cancel, button#partido-cancel { background: transparent; border: 1p
 }
 
 .hint { color: var(--text-secondary); font-size: 13px; }
+.sync-status-row { display: flex; align-items: center; gap: 6px; margin: var(--space-xs) 0 var(--space-md); }
+.sync-status-row .hint { margin: 0; }
 
 .chart-container {
   position: relative;
@@ -869,6 +964,12 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+}
+.wellness-readiness-titulo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 .wellness-readiness-titulo {
   font-family: var(--font-heading);
