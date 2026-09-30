@@ -111,6 +111,18 @@ async function apiGet(path) {
   return res.json();
 }
 
+/** Fecha en formato YYYY-MM-DD según el calendario LOCAL del dispositivo,
+ *  no UTC. `Date.toISOString()` convierte a UTC antes de formatear, así que
+ *  para cualquiera con offset positivo (p.ej. Canarias en horario de
+ *  verano, UTC+1) la medianoche local del día X es todavía el día X-1 en
+ *  UTC — eso hacía que el calendario de entrenos desplazara cada actividad
+ *  un día hacia atrás. Usar los getters locales evita ese desfase. */
+function fechaLocalISO(d) {
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mes}-${dia}`;
+}
+
 function fmtMinSec(totalMin) {
   if (totalMin == null) return "—";
   const h = Math.floor(totalMin / 60);
@@ -780,7 +792,7 @@ async function fetchHistoricoRiesgo(diasWellnessMin = DIAS_HISTORICO_RIESGO) {
   const desdeRiesgo = new Date();
   desdeRiesgo.setDate(desdeRiesgo.getDate() - DIAS_HISTORICO_RIESGO);
   const garminRiesgo = await apiGet(
-    `/api/garmin?tipo=todos&limit=200&desde=${desdeRiesgo.toISOString().slice(0, 10)}`
+    `/api/garmin?tipo=todos&limit=200&desde=${fechaLocalISO(desdeRiesgo)}`
   ).catch(() => null);
 
   return { snapshotsTodos, actividades: (garminRiesgo && garminRiesgo.activities) || [], wellness };
@@ -1193,7 +1205,7 @@ function desdeParaRango(rango) {
   } else {
     return null; // "todo"
   }
-  return d.toISOString().slice(0, 10);
+  return fechaLocalISO(d);
 }
 
 /** Límites {desde, hasta} (YYYY-MM-DD o null) según el filtro de periodo.
@@ -1238,22 +1250,39 @@ async function loadGarmin() {
 // pase lo que pase con qué otros tipos aparezcan al lado (nunca se asigna
 // por índice/orden, que cambia según el filtro). Los tipos que no están
 // aquí caen en el color "otro".
+//
+// Toda la gama son tonos de azul: el rojo/amarillo/verde y el gris quedan
+// reservados para semáforos e indicadores de estado (riesgo de lesión,
+// goles de error/dudoso/nada que hacer); esto es solo una distribución,
+// sin ninguna lectura de "bueno/malo", así que no debía competir
+// visualmente con esos otros colores.
 const TIPO_ENTRENO_COLOR = {
-  futsal: "#2D82FF",
-  strength_training: "#FF9100",
-  fuerza: "#FF9100",
-  hiit: "#FF3B5C",
-  running: "#00E676",
-  cycling: "#8A6FFF",
-  indoor_cycling: "#8A6FFF",
-  walking: "#00C4B3",
-  swimming: "#4FA3FF",
-  lap_swimming: "#4FA3FF",
-  yoga: "#FFB800",
-  otro: "#6B7A99",
+  futsal: "#0F78F0",
+  strength_training: "#318DF6",
+  fuerza: "#318DF6",
+  hiit: "#1866BF",
+  running: "#5AA3F6",
+  cycling: "#185395",
+  indoor_cycling: "#185395",
+  walking: "#86B9F3",
+  swimming: "#143F71",
+  lap_swimming: "#143F71",
+  yoga: "#0E2C4E",
+  otro: "#5F6F81",
 };
 function colorTipoEntreno(clave) {
   return TIPO_ENTRENO_COLOR[clave] || TIPO_ENTRENO_COLOR.otro;
+}
+
+/** Color de texto legible (claro u oscuro) sobre un fondo hexadecimal
+ *  dado, según su luminancia relativa — necesario aquí porque la gama de
+ *  azules va de tonos muy oscuros a bastante claros, así que un único
+ *  color de texto fijo no seria legible en todos los casos. */
+function colorTextoSobre(hex) {
+  const [r, g, b] = hex.match(/[0-9a-f]{2}/gi).map((h) => parseInt(h, 16) / 255);
+  const toLin = (v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  const luminancia = 0.2126 * toLin(r) + 0.7152 * toLin(g) + 0.0722 * toLin(b);
+  return luminancia > 0.35 ? "var(--bg-main)" : "var(--text-primary)";
 }
 
 /** Algoritmo "squarify" (Bruls/Huizing/van Wijk) para un treemap: reparte
@@ -1379,7 +1408,9 @@ function renderDistribucionTipos(actividades) {
     cell.style.top = (r.y / altoPx) * 100 + "%";
     cell.style.width = (r.w / anchoPx) * 100 + "%";
     cell.style.height = (r.h / altoPx) * 100 + "%";
-    cell.style.background = colorTipoEntreno(r.clave);
+    const colorFondo = colorTipoEntreno(r.clave);
+    cell.style.background = colorFondo;
+    cell.style.color = colorTextoSobre(colorFondo);
     const pct = Math.round((r.value / total) * 100);
     cell.title = `${formatTipoGarmin(r.clave)}: ${fmtMinSec(r.value)} (${pct}%)`;
     // Si el rectángulo es demasiado pequeño (en píxeles reales), el texto
@@ -1412,7 +1443,7 @@ async function cargarCalendarioEntrenos() {
   const meses = parseInt(document.getElementById("calendario-meses").value, 10) || 3;
   const desde = new Date();
   desde.setMonth(desde.getMonth() - meses);
-  const desdeStr = desde.toISOString().slice(0, 10);
+  const desdeStr = fechaLocalISO(desde);
   let actividades = [];
   try {
     const data = await apiGet(`/api/garmin?tipo=todos&limit=1000&desde=${desdeStr}`);
@@ -1450,6 +1481,28 @@ function renderCalendarioEntrenos(actividades, meses) {
   const diaSemanaISO = (inicio.getDay() + 6) % 7; // 0=lunes .. 6=domingo
   inicio.setDate(inicio.getDate() - diaSemanaISO);
 
+  // Tamaño de celda dinámico: con pocos meses filtrados (pocas semanas) el
+  // calendario quedaba apretado en la esquina izquierda con un rectángulo
+  // vacío al lado. Calculando el tamaño de celda a partir del ancho
+  // disponible / nº de semanas, el calendario rellena siempre todo el
+  // ancho de la tarjeta; solo si hay demasiadas semanas para que las
+  // celdas sigan siendo legibles (rangos largos, 12-24 meses) se fija un
+  // tamaño mínimo y aparece scroll horizontal, como en GitHub.
+  const totalDias = Math.floor((hoy - inicio) / 86400000) + 1;
+  const numSemanas = Math.ceil(totalDias / 7);
+  const scrollEl = el.parentElement;
+  const anchoDisponible = scrollEl.clientWidth || 300;
+  const gapPx = numSemanas > 40 ? 2 : 3;
+  const CELL_MIN = 9;
+  let cellSize = (anchoDisponible - gapPx * (numSemanas - 1)) / numSemanas;
+  cellSize = Math.max(CELL_MIN, Math.floor(cellSize));
+  const rellenaSinScroll = cellSize * numSemanas + gapPx * (numSemanas - 1) <= anchoDisponible + 1;
+
+  el.style.gap = gapPx + "px";
+  el.style.gridTemplateRows = `16px repeat(7, ${cellSize}px)`;
+  el.style.gridAutoColumns = `${cellSize}px`;
+  el.style.width = rellenaSinScroll ? "100%" : "max-content";
+
   const etiquetasMes = [{ weekIndex: 0, texto: MESES_CORTOS[inicio.getMonth()] }];
   let mesVisto = `${inicio.getFullYear()}-${inicio.getMonth()}`;
 
@@ -1458,7 +1511,7 @@ function renderCalendarioEntrenos(actividades, meses) {
   while (cursor <= hoy) {
     const weekIndex = Math.floor(dia / 7);
     const weekday = (cursor.getDay() + 6) % 7;
-    const fechaStr = cursor.toISOString().slice(0, 10);
+    const fechaStr = fechaLocalISO(cursor);
     const minutos = minutosPorDia[fechaStr] || 0;
     const nivel = minutos <= 0 ? 0 : Math.min(4, Math.max(1, Math.ceil((minutos / maxMinutos) * 4)));
 
@@ -2022,10 +2075,7 @@ document.getElementById("form-partido").addEventListener("submit", async (e) => 
 // mismo listado, mismo cálculo de carga de entreno para el riesgo de lesión),
 // solo que con manual: true en vez de venir del sync.
 function fechaLocalHoy() {
-  const d = new Date();
-  const mes = String(d.getMonth() + 1).padStart(2, "0");
-  const dia = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mes}-${dia}`;
+  return fechaLocalISO(new Date());
 }
 
 function construirRpeSelectorManual() {

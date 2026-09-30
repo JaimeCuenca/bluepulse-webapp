@@ -448,18 +448,22 @@ button#login-cancel, button#partido-cancel { background: transparent; border: 1p
   overflow: hidden;
   cursor: default;
 }
+/* El color de texto se fija en JS por celda (colorTextoSobre), según la
+   luminancia de su tono de azul concreto — la gama va de azules muy
+   oscuros a bastante claros, así que un color de texto único no sería
+   legible en todos los casos. Aquí solo se hereda ese color. */
 .treemap-cell-label {
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 12px;
   line-height: 1.1;
-  color: var(--bg-main);
+  color: inherit;
 }
 .treemap-cell-value {
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 10px;
-  color: var(--bg-main);
+  color: inherit;
   opacity: 0.85;
 }
 
@@ -489,12 +493,15 @@ button#login-cancel, button#partido-cancel { background: transparent; border: 1p
   padding-bottom: 4px;
 }
 .training-calendar {
+  /* El tamaño de celda, el nº de filas/columnas, el gap y el ancho final
+     (100% o max-content) se fijan en JS según cuántas semanas quepan y el
+     ancho disponible, para que el calendario rellene la tarjeta en vez de
+     quedarse con hueco vacío cuando el rango filtrado es corto. */
   position: relative;
   display: grid;
-  grid-template-rows: 14px repeat(7, 12px);
+  grid-template-rows: 16px repeat(7, 12px);
   grid-auto-columns: 12px;
   gap: 3px;
-  width: max-content;
 }
 .training-calendar-month-label {
   grid-row: 1;
@@ -511,6 +518,13 @@ button#login-cancel, button#partido-cancel { background: transparent; border: 1p
   background: var(--bg-surface-elevated);
   cursor: pointer;
   transition: transform 0.1s ease;
+}
+/* Las celdas reales de la rejilla (no las de la leyenda) no llevan tamaño
+   fijo: se estiran para ocupar la pista que les da la rejilla, cuyo
+   tamaño calcula JS según el nº de semanas visibles. */
+#calendario-entrenos .training-calendar-day {
+  width: auto;
+  height: auto;
 }
 .training-calendar-day:hover { transform: scale(1.25); }
 .training-calendar-day.nivel-0 { background: var(--bg-surface-elevated); cursor: default; }
