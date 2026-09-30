@@ -1362,26 +1362,35 @@ function renderDistribucionTipos(actividades) {
   treemapEl.innerHTML = "";
 
   const total = items.reduce((s, i) => s + i.value, 0);
-  const rects = squarify(items, 0, 0, 100, 100);
+  // El contenedor ya no es cuadrado (ahora es rectangular, del mismo ancho
+  // que el calendario), así que el squarify se calcula sobre su forma real
+  // en píxeles — si se calculara sobre un cuadrado ficticio de 100x100 y
+  // luego se estirara a un rectángulo ancho, los rectángulos "cuadrados"
+  // del algoritmo saldrían distorsionados (más anchos que altos de más).
+  const rectContenedor = treemapEl.getBoundingClientRect();
+  const anchoPx = rectContenedor.width || 300;
+  const altoPx = rectContenedor.height || 220;
+  const rects = squarify(items, 0, 0, anchoPx, altoPx);
 
   for (const r of rects) {
     const cell = document.createElement("div");
     cell.className = "treemap-cell";
-    cell.style.left = r.x + "%";
-    cell.style.top = r.y + "%";
-    cell.style.width = r.w + "%";
-    cell.style.height = r.h + "%";
+    cell.style.left = (r.x / anchoPx) * 100 + "%";
+    cell.style.top = (r.y / altoPx) * 100 + "%";
+    cell.style.width = (r.w / anchoPx) * 100 + "%";
+    cell.style.height = (r.h / altoPx) * 100 + "%";
     cell.style.background = colorTipoEntreno(r.clave);
     const pct = Math.round((r.value / total) * 100);
     cell.title = `${formatTipoGarmin(r.clave)}: ${fmtMinSec(r.value)} (${pct}%)`;
-    // Si el rectángulo es demasiado pequeño, el texto no cabe y se omite
-    // (queda igualmente el color + el tooltip al pasar/tocar).
-    if (r.w >= 16 && r.h >= 13) {
+    // Si el rectángulo es demasiado pequeño (en píxeles reales), el texto
+    // no cabe y se omite (queda igualmente el color + el tooltip al
+    // pasar/tocar).
+    if (r.w >= 60 && r.h >= 28) {
       const label = document.createElement("span");
       label.className = "treemap-cell-label";
       label.textContent = formatTipoGarmin(r.clave);
       cell.appendChild(label);
-      if (r.h >= 20) {
+      if (r.h >= 44) {
         const value = document.createElement("span");
         value.className = "treemap-cell-value";
         value.textContent = fmtMinSec(r.value);
@@ -1393,28 +1402,28 @@ function renderDistribucionTipos(actividades) {
 }
 
 // ---------- Calendario de entrenos (estilo "heatmap de commits" de GitHub) ----------
-const DIAS_CALENDARIO_ENTRENOS = 371; // ~53 semanas: último año, siempre, sin depender del filtro de periodo
 const MESES_CORTOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-/** El calendario siempre muestra el último año completo, independiente del
- *  filtro de periodo de arriba (igual que el gráfico de contribuciones de
- *  GitHub no depende de ningún filtro): por eso pide sus propios datos en
- *  vez de reutilizar garminActividadesCache. */
+/** El calendario no depende del filtro de "Periodo" de arriba (igual que el
+ *  gráfico de contribuciones de GitHub no depende de ningún filtro externo):
+ *  tiene su propio selector de nº de meses (por defecto 3) y pide sus
+ *  propios datos en vez de reutilizar garminActividadesCache. */
 async function cargarCalendarioEntrenos() {
+  const meses = parseInt(document.getElementById("calendario-meses").value, 10) || 3;
   const desde = new Date();
-  desde.setDate(desde.getDate() - DIAS_CALENDARIO_ENTRENOS);
+  desde.setMonth(desde.getMonth() - meses);
   const desdeStr = desde.toISOString().slice(0, 10);
   let actividades = [];
   try {
-    const data = await apiGet(`/api/garmin?tipo=todos&limit=500&desde=${desdeStr}`);
+    const data = await apiGet(`/api/garmin?tipo=todos&limit=1000&desde=${desdeStr}`);
     actividades = data.activities || [];
   } catch (e) {
     console.error("No se pudo cargar el calendario de entrenos:", e);
   }
-  renderCalendarioEntrenos(actividades);
+  renderCalendarioEntrenos(actividades, meses);
 }
 
-function renderCalendarioEntrenos(actividades) {
+function renderCalendarioEntrenos(actividades, meses) {
   const container = document.getElementById("garmin-calendario-container");
   const el = document.getElementById("calendario-entrenos");
 
@@ -1435,13 +1444,13 @@ function renderCalendarioEntrenos(actividades) {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   const inicio = new Date(hoy);
-  inicio.setDate(inicio.getDate() - DIAS_CALENDARIO_ENTRENOS);
+  inicio.setMonth(inicio.getMonth() - meses);
   // Retrocede hasta el lunes de esa semana, para que las columnas queden
   // alineadas lunes-domingo de arriba abajo.
   const diaSemanaISO = (inicio.getDay() + 6) % 7; // 0=lunes .. 6=domingo
   inicio.setDate(inicio.getDate() - diaSemanaISO);
 
-  const meses = [{ weekIndex: 0, texto: MESES_CORTOS[inicio.getMonth()] }];
+  const etiquetasMes = [{ weekIndex: 0, texto: MESES_CORTOS[inicio.getMonth()] }];
   let mesVisto = `${inicio.getFullYear()}-${inicio.getMonth()}`;
 
   const cursor = new Date(inicio);
@@ -1466,7 +1475,7 @@ function renderCalendarioEntrenos(actividades) {
       const clave = `${cursor.getFullYear()}-${cursor.getMonth()}`;
       if (clave !== mesVisto) {
         mesVisto = clave;
-        meses.push({ weekIndex, texto: MESES_CORTOS[cursor.getMonth()] });
+        etiquetasMes.push({ weekIndex, texto: MESES_CORTOS[cursor.getMonth()] });
       }
     }
 
@@ -1478,8 +1487,8 @@ function renderCalendarioEntrenos(actividades) {
   // el calendario arranca a finales de mes, justo antes de que empiece el
   // siguiente) se solapan ("SepOct"). En ese caso se descarta la primera,
   // que además es la de un mes casi sin columnas propias.
-  const mesesFiltrados = meses.filter((m, i) => {
-    const siguiente = meses[i + 1];
+  const mesesFiltrados = etiquetasMes.filter((m, i) => {
+    const siguiente = etiquetasMes[i + 1];
     return !siguiente || siguiente.weekIndex - m.weekIndex >= 2;
   });
 
@@ -1516,6 +1525,7 @@ document.getElementById("garmin-rango").addEventListener("change", () => {
 document.getElementById("garmin-desde").addEventListener("change", loadGarmin);
 document.getElementById("garmin-hasta").addEventListener("change", loadGarmin);
 document.getElementById("garmin-tipo").addEventListener("change", renderGarminList);
+document.getElementById("calendario-meses").addEventListener("change", cargarCalendarioEntrenos);
 
 // ---------- Toasts del FAB ----------
 const fabToastContainer = document.getElementById("fabToastContainer");

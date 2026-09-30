@@ -416,13 +416,19 @@ button#login-cancel, button#partido-cancel { background: transparent; border: 1p
 }
 .chart-container-square canvas { width: 100% !important; height: 100% !important; }
 
+/* Contenedor ancho (mismo ancho que el calendario, no cuadrado) para el
+   treemap de distribución de entrenos por tipo. */
+.treemap-wide {
+  display: flex;
+  flex-direction: column;
+}
 /* Treemap "de cuadriláteros" con la distribución de entrenos por tipo:
    cada rectángulo ocupa un área proporcional a su duración total, con un
    hueco de 2px (el fondo de la tarjeta) entre piezas y color fijo por tipo
    (nunca por índice/orden, para que un mismo tipo se vea siempre igual). */
 .treemap {
   position: relative;
-  flex: 1;
+  height: 220px;
   margin-top: var(--space-xs);
   border-radius: 4px;
   overflow: hidden;
@@ -465,6 +471,16 @@ button#login-cancel, button#partido-cancel { background: transparent; border: 1p
   padding: var(--space-sm);
   margin-bottom: var(--space-lg);
 }
+
+.chart-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-xs);
+}
+.chart-header-row select { width: auto; }
 
 /* Calendario "estilo GitHub": una columna por semana, una fila por día de
    la semana (lunes arriba), coloreado por minutos entrenados ese día. */
