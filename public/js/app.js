@@ -707,7 +707,7 @@ function calcularRiesgo(snapshots, actividades) {
       valor: compSueno,
       detalle:
         mediaSueno != null && hoy.sueno_horas != null
-          ? `${fmtMinSec(Math.round(hoy.sueno_horas * 60))} anoche vs. ${fmtMinSec(Math.round(mediaSueno * 60))} de media`
+          ? `${fmtMinSec(Math.round(hoy.sueno_horas * 60))} · media ${fmtMinSec(Math.round(mediaSueno * 60))}`
           : null,
     },
     {
@@ -715,7 +715,7 @@ function calcularRiesgo(snapshots, actividades) {
       valor: compBateria,
       detalle:
         mediaBateria != null && bateriaHoy != null
-          ? `${Math.round(bateriaHoy)}% hoy vs. ${Math.round(mediaBateria)}% de media`
+          ? `${Math.round(bateriaHoy)}% · media ${Math.round(mediaBateria)}%`
           : null,
     },
     {
@@ -723,13 +723,13 @@ function calcularRiesgo(snapshots, actividades) {
       valor: compFc,
       detalle:
         mediaFc != null && hoy.fc_reposo != null
-          ? `${Math.round(hoy.fc_reposo)} ppm hoy vs. ${Math.round(mediaFc)} ppm de media`
+          ? `${Math.round(hoy.fc_reposo)} ppm · media ${Math.round(mediaFc)} ppm`
           : null,
     },
     {
-      nombre: "carga de entreno (ACWR)",
+      nombre: "carga de entreno",
       valor: compAcwr,
-      detalle: acwr != null ? `${acwr.toFixed(2)} (zona recomendada: 0.8-1.3)` : null,
+      detalle: acwr != null ? `ACWR ${acwr.toFixed(2)} · rango 0.8-1.3` : null,
     },
   ].filter((c) => c.valor != null);
 
@@ -781,21 +781,18 @@ function renderRiesgoPropio(snapshots, actividades) {
   const { score, nivel, nivelTexto, componentes, factoresNegativos } = riesgo;
   box.classList.add(`riesgo-${nivel}`);
 
-  const explicacion = factoresNegativos.length
-    ? `Pesan en contra: ${factoresNegativos.map((c) => c.nombre).join(", ")}.`
-    : "Ningún factor destaca especialmente hoy.";
-
+  const negativos = new Set(factoresNegativos);
   const detalles = componentes
     .filter((c) => c.detalle)
-    .map(
-      (c) =>
-        `<span class="wellness-readiness-item">${c.nombre[0].toUpperCase() + c.nombre.slice(1)}: ${c.detalle}</span>`
-    )
+    .map((c) => {
+      const clase = negativos.has(c) ? "wellness-readiness-item wellness-readiness-item--negativo" : "wellness-readiness-item";
+      const nombre = c.nombre[0].toUpperCase() + c.nombre.slice(1);
+      return `<span class="${clase}"><strong>${nombre}:</strong> ${c.detalle}</span>`;
+    })
     .join("");
 
   box.innerHTML = `
     <span class="wellness-readiness-titulo-row"><span class="wellness-readiness-titulo">${nivelTexto} <span class="wellness-readiness-score">(${score}/100)</span></span>${infoWrapHTML(TEXTO_INFO_RIESGO)}</span>
-    <span class="wellness-readiness-item">${explicacion}</span>
     ${detalles}
   `;
   box.style.display = "flex";

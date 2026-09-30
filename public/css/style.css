@@ -983,6 +983,9 @@ dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px;
 }
 .wellness-readiness-item { font-size: 13px; color: var(--text-secondary); }
 .wellness-readiness-item strong { color: var(--text-primary); }
+/* Factores que están pesando negativamente en el score: solo se resalta
+   el nombre en el color de estado, sin frase aparte explicándolo. */
+.wellness-readiness-item--negativo strong { color: var(--status-danger); }
 .wellness-readiness-origen { font-size: 11px; color: var(--text-muted); }
 .wellness-readiness-score { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
 
