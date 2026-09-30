@@ -122,6 +122,16 @@ body {
 }
 
 /* ---------- Header / marca ---------- */
+/* El fondo difuminado vive en ::before (no en .topbar directamente) a
+   propósito: cualquier elemento con backdrop-filter/filter/transform se
+   convierte en el "containing block" de sus descendientes con position:fixed
+   — y .tabs, que es hijo de .topbar, pasa a fixed en móvil (barra de
+   pestañas inferior). Si el filtro vive en el propio .topbar, esa barra deja
+   de anclarse a la pantalla y se ancla al propio .topbar (56px de alto),
+   quedando superpuesta encima del logo en vez de al fondo. Con el filtro en
+   ::before, .topbar ya no tiene backdrop-filter en su propio computed style,
+   así que deja de "atrapar" a .tabs y el anclaje a pantalla vuelve a
+   funcionar. El aspecto visual (cristal esmerilado) es idéntico. */
 .topbar {
   display: flex;
   align-items: center;
@@ -132,11 +142,17 @@ body {
   border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
+  z-index: 10;
+  flex-wrap: wrap;
+}
+.topbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: rgba(7, 11, 20, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  z-index: 10;
-  flex-wrap: wrap;
+  z-index: -1;
 }
 
 .brand { display: flex; align-items: center; gap: var(--space-sm); }
