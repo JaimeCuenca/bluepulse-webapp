@@ -182,7 +182,24 @@
       <p class="hint">Para sincronizar con Garmin, usa el botón ⟳ flotante de abajo a la derecha. Para futsal (u otro entreno que no puedas medir con el reloj), añádelo a mano.</p>
 
       <div class="chart-container-square" id="garmin-distribucion-container">
-        <canvas id="chart-tipos-entreno"></canvas>
+        <p class="resumen-subtitulo-menor" style="margin-top:0;">Distribución de entrenos por tipo (minutos)</p>
+        <div id="treemap-tipos-entreno" class="treemap"></div>
+      </div>
+
+      <div class="chart-container-wide" id="garmin-calendario-container">
+        <p class="resumen-subtitulo-menor" style="margin-top:0;">Calendario de entrenos (últimos 12 meses)</p>
+        <div class="training-calendar-scroll">
+          <div id="calendario-entrenos" class="training-calendar"></div>
+        </div>
+        <div class="training-calendar-legend">
+          <span>Menos</span>
+          <span class="training-calendar-day nivel-0"></span>
+          <span class="training-calendar-day nivel-1"></span>
+          <span class="training-calendar-day nivel-2"></span>
+          <span class="training-calendar-day nivel-3"></span>
+          <span class="training-calendar-day nivel-4"></span>
+          <span>Más</span>
+        </div>
       </div>
 
       <div id="garmin-list" class="activity-list"></div>

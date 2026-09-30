@@ -118,7 +118,7 @@ function fmtMinSec(totalMin) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-let chartBattery, chartSleep, chartKcal, chartGoles, chartMotivos, chartTiposEntreno, chartGolesPorPartido;
+let chartBattery, chartSleep, chartKcal, chartGoles, chartMotivos, chartGolesPorPartido;
 
 // ---------- Tipos de gol: nombre visible y color ----------
 const TIPO_LABELS = {
@@ -1231,14 +1231,111 @@ async function loadGarmin() {
   garminActividadesCache = activities;
   actualizarSelectorTipoGarmin();
   renderGarminList();
+  cargarCalendarioEntrenos();
 }
 
-/** Gráfico "de área polar" (Chart.js polarArea) con la distribución del
- *  tipo de entrenamiento (por duración total) en el periodo filtrado. Solo
- *  tiene sentido viendo TODOS los tipos a la vez — si se filtra por uno
- *  concreto no hay nada que distribuir, así que el bloque entero se oculta. */
+// Color fijo por tipo de entreno: SIEMPRE el mismo tipo -> el mismo color,
+// pase lo que pase con qué otros tipos aparezcan al lado (nunca se asigna
+// por índice/orden, que cambia según el filtro). Los tipos que no están
+// aquí caen en el color "otro".
+const TIPO_ENTRENO_COLOR = {
+  futsal: "#2D82FF",
+  strength_training: "#FF9100",
+  fuerza: "#FF9100",
+  hiit: "#FF3B5C",
+  running: "#00E676",
+  cycling: "#8A6FFF",
+  indoor_cycling: "#8A6FFF",
+  walking: "#00C4B3",
+  swimming: "#4FA3FF",
+  lap_swimming: "#4FA3FF",
+  yoga: "#FFB800",
+  otro: "#6B7A99",
+};
+function colorTipoEntreno(clave) {
+  return TIPO_ENTRENO_COLOR[clave] || TIPO_ENTRENO_COLOR.otro;
+}
+
+/** Algoritmo "squarify" (Bruls/Huizing/van Wijk) para un treemap: reparte
+ *  un rectángulo x0,y0,w0,h0 en sub-rectángulos cuya área es proporcional
+ *  al "value" de cada item, intentando mantenerlos lo más cuadrados
+ *  posible (evita tiras finísimas ilegibles). `values` debe venir ya
+ *  ordenado de mayor a menor. Devuelve cada item con {x,y,w,h} añadidos,
+ *  en las mismas unidades que x0/y0/w0/h0 (aquí, puntos porcentuales). */
+function squarify(values, x0, y0, w0, h0) {
+  const result = [];
+  function worst(lens, length) {
+    let max = -Infinity, min = Infinity, sum = 0;
+    for (const v of lens) {
+      if (v > max) max = v;
+      if (v < min) min = v;
+      sum += v;
+    }
+    const s2 = sum * sum, l2 = length * length;
+    return Math.max((l2 * max) / s2, s2 / (l2 * min));
+  }
+  function layoutRow(row, x, y, w, h, horizontal) {
+    const sum = row.reduce((s, r) => s + r.value, 0);
+    let offset = 0;
+    for (const item of row) {
+      const frac = sum > 0 ? item.value / sum : 0;
+      if (horizontal) {
+        const rw = frac * w;
+        result.push({ ...item, x: x + offset, y, w: rw, h });
+        offset += rw;
+      } else {
+        const rh = frac * h;
+        result.push({ ...item, x, y: y + offset, w, h: rh });
+        offset += rh;
+      }
+    }
+  }
+  function recurse(items, x, y, w, h) {
+    if (!items.length) return;
+    if (items.length === 1) {
+      result.push({ ...items[0], x, y, w, h });
+      return;
+    }
+    const total = items.reduce((s, i) => s + i.value, 0);
+    const length = Math.min(w, h);
+    const scale = (w * h) / total;
+    let row = [items[0]];
+    let i = 1;
+    while (i < items.length) {
+      const nextRow = row.concat(items[i]);
+      const rowLen = row.map((v) => v.value * scale);
+      const nextLen = nextRow.map((v) => v.value * scale);
+      if (worst(rowLen, length) >= worst(nextLen, length)) {
+        row = nextRow;
+        i++;
+      } else break;
+    }
+    const remaining = items.slice(row.length);
+    const rowSum = row.reduce((a, b) => a + b.value, 0);
+    const rowArea = rowSum * scale;
+    const horizontal = w >= h;
+    if (horizontal) {
+      const rowWidth = rowArea / h;
+      layoutRow(row, x, y, rowWidth, h, false);
+      recurse(remaining, x + rowWidth, y, w - rowWidth, h);
+    } else {
+      const rowHeight = rowArea / w;
+      layoutRow(row, x, y, w, rowHeight, true);
+      recurse(remaining, x, y + rowHeight, w, h - rowHeight);
+    }
+  }
+  recurse(values, x0, y0, w0, h0);
+  return result;
+}
+
+/** Treemap (cuadrilátero dividido en cuadriláteros más grandes o pequeños
+ *  según la duración) con la distribución del tipo de entrenamiento en el
+ *  periodo filtrado. Solo tiene sentido viendo TODOS los tipos a la vez —
+ *  si se filtra por uno concreto no hay nada que distribuir, así que el
+ *  bloque entero se oculta. */
 function renderDistribucionTipos(actividades) {
   const container = document.getElementById("garmin-distribucion-container");
+  const treemapEl = document.getElementById("treemap-tipos-entreno");
   const tipo = document.getElementById("garmin-tipo").value;
 
   if (tipo !== "todos" || !actividades.length) {
@@ -1251,40 +1348,147 @@ function renderDistribucionTipos(actividades) {
     const clave = claveTipo(act);
     duracionPorTipo[clave] = (duracionPorTipo[clave] || 0) + (act.duracion_min || 0);
   }
-  const claves = Object.keys(duracionPorTipo).filter((c) => duracionPorTipo[c] > 0);
-  if (!claves.length) {
+  const items = Object.keys(duracionPorTipo)
+    .map((clave) => ({ clave, value: Math.round(duracionPorTipo[clave]) }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value);
+
+  if (!items.length) {
     container.style.display = "none";
     return;
   }
 
-  container.style.display = "block";
-  // Paleta genérica (no todos los tipos de entreno tienen un color de marca
-  // como los goles); se cicla si hay más tipos que colores.
-  const PALETA = ["#2D82FF", "#00E676", "#FF9100", "#00C4B3", "#FF3B5C", "#8A6FFF", "#FFB800", "#4FA3FF"];
-  if (chartTiposEntreno) chartTiposEntreno.destroy();
+  container.style.display = "flex";
+  treemapEl.innerHTML = "";
+
+  const total = items.reduce((s, i) => s + i.value, 0);
+  const rects = squarify(items, 0, 0, 100, 100);
+
+  for (const r of rects) {
+    const cell = document.createElement("div");
+    cell.className = "treemap-cell";
+    cell.style.left = r.x + "%";
+    cell.style.top = r.y + "%";
+    cell.style.width = r.w + "%";
+    cell.style.height = r.h + "%";
+    cell.style.background = colorTipoEntreno(r.clave);
+    const pct = Math.round((r.value / total) * 100);
+    cell.title = `${formatTipoGarmin(r.clave)}: ${fmtMinSec(r.value)} (${pct}%)`;
+    // Si el rectángulo es demasiado pequeño, el texto no cabe y se omite
+    // (queda igualmente el color + el tooltip al pasar/tocar).
+    if (r.w >= 16 && r.h >= 13) {
+      const label = document.createElement("span");
+      label.className = "treemap-cell-label";
+      label.textContent = formatTipoGarmin(r.clave);
+      cell.appendChild(label);
+      if (r.h >= 20) {
+        const value = document.createElement("span");
+        value.className = "treemap-cell-value";
+        value.textContent = fmtMinSec(r.value);
+        cell.appendChild(value);
+      }
+    }
+    treemapEl.appendChild(cell);
+  }
+}
+
+// ---------- Calendario de entrenos (estilo "heatmap de commits" de GitHub) ----------
+const DIAS_CALENDARIO_ENTRENOS = 371; // ~53 semanas: último año, siempre, sin depender del filtro de periodo
+const MESES_CORTOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+/** El calendario siempre muestra el último año completo, independiente del
+ *  filtro de periodo de arriba (igual que el gráfico de contribuciones de
+ *  GitHub no depende de ningún filtro): por eso pide sus propios datos en
+ *  vez de reutilizar garminActividadesCache. */
+async function cargarCalendarioEntrenos() {
+  const desde = new Date();
+  desde.setDate(desde.getDate() - DIAS_CALENDARIO_ENTRENOS);
+  const desdeStr = desde.toISOString().slice(0, 10);
+  let actividades = [];
   try {
-    chartTiposEntreno = new Chart(document.getElementById("chart-tipos-entreno"), {
-      type: "polarArea",
-      data: {
-        labels: claves.map(formatTipoGarmin),
-        datasets: [
-          {
-            data: claves.map((c) => Math.round(duracionPorTipo[c])),
-            backgroundColor: claves.map((_, i) => PALETA[i % PALETA.length] + "cc"),
-          },
-        ],
-      },
-      options: {
-        maintainAspectRatio: false,
-        plugins: {
-          title: { display: true, text: "Distribución de entrenos por tipo (minutos)" },
-          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${fmtMinSec(ctx.raw)}` } },
-        },
-        scales: { r: { ticks: { display: false } } },
-      },
-    });
+    const data = await apiGet(`/api/garmin?tipo=todos&limit=500&desde=${desdeStr}`);
+    actividades = data.activities || [];
   } catch (e) {
-    console.error("No se pudo dibujar el gráfico de distribución de entrenos:", e);
+    console.error("No se pudo cargar el calendario de entrenos:", e);
+  }
+  renderCalendarioEntrenos(actividades);
+}
+
+function renderCalendarioEntrenos(actividades) {
+  const container = document.getElementById("garmin-calendario-container");
+  const el = document.getElementById("calendario-entrenos");
+
+  if (!actividades.length) {
+    container.style.display = "none";
+    return;
+  }
+  container.style.display = "block";
+  el.innerHTML = "";
+
+  const minutosPorDia = {};
+  for (const act of actividades) {
+    if (!act.fecha) continue;
+    minutosPorDia[act.fecha] = (minutosPorDia[act.fecha] || 0) + (act.duracion_min || 0);
+  }
+  const maxMinutos = Math.max(1, ...Object.values(minutosPorDia));
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const inicio = new Date(hoy);
+  inicio.setDate(inicio.getDate() - DIAS_CALENDARIO_ENTRENOS);
+  // Retrocede hasta el lunes de esa semana, para que las columnas queden
+  // alineadas lunes-domingo de arriba abajo.
+  const diaSemanaISO = (inicio.getDay() + 6) % 7; // 0=lunes .. 6=domingo
+  inicio.setDate(inicio.getDate() - diaSemanaISO);
+
+  const meses = [{ weekIndex: 0, texto: MESES_CORTOS[inicio.getMonth()] }];
+  let mesVisto = `${inicio.getFullYear()}-${inicio.getMonth()}`;
+
+  const cursor = new Date(inicio);
+  let dia = 0;
+  while (cursor <= hoy) {
+    const weekIndex = Math.floor(dia / 7);
+    const weekday = (cursor.getDay() + 6) % 7;
+    const fechaStr = cursor.toISOString().slice(0, 10);
+    const minutos = minutosPorDia[fechaStr] || 0;
+    const nivel = minutos <= 0 ? 0 : Math.min(4, Math.max(1, Math.ceil((minutos / maxMinutos) * 4)));
+
+    const celda = document.createElement("div");
+    celda.className = `training-calendar-day nivel-${nivel}`;
+    celda.style.gridColumn = String(weekIndex + 1);
+    celda.style.gridRow = String(weekday + 2);
+    const etiquetaFecha = cursor.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+    celda.title = minutos > 0 ? `${etiquetaFecha}: ${fmtMinSec(minutos)} de entreno` : `${etiquetaFecha}: sin entreno`;
+    celda.addEventListener("click", () => mostrarToast(celda.title, { id: "calendario-dia", duracion: 2500 }));
+    el.appendChild(celda);
+
+    if (cursor.getDate() === 1) {
+      const clave = `${cursor.getFullYear()}-${cursor.getMonth()}`;
+      if (clave !== mesVisto) {
+        mesVisto = clave;
+        meses.push({ weekIndex, texto: MESES_CORTOS[cursor.getMonth()] });
+      }
+    }
+
+    cursor.setDate(cursor.getDate() + 1);
+    dia++;
+  }
+
+  // Si dos etiquetas de mes quedan a menos de 2 columnas de distancia (p.ej.
+  // el calendario arranca a finales de mes, justo antes de que empiece el
+  // siguiente) se solapan ("SepOct"). En ese caso se descarta la primera,
+  // que además es la de un mes casi sin columnas propias.
+  const mesesFiltrados = meses.filter((m, i) => {
+    const siguiente = meses[i + 1];
+    return !siguiente || siguiente.weekIndex - m.weekIndex >= 2;
+  });
+
+  for (const m of mesesFiltrados) {
+    const label = document.createElement("div");
+    label.className = "training-calendar-month-label";
+    label.style.gridColumn = String(m.weekIndex + 1);
+    label.textContent = m.texto;
+    el.appendChild(label);
   }
 }
 

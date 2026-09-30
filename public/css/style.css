@@ -404,6 +404,8 @@ button#login-cancel, button#partido-cancel { background: transparent; border: 1p
    tamaño razonable en pantallas grandes, y a lo ancho disponible en móvil. */
 .chart-container-square {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: min(100%, 340px);
   aspect-ratio: 1 / 1;
   margin: 0 auto var(--space-lg);
@@ -413,6 +415,106 @@ button#login-cancel, button#partido-cancel { background: transparent; border: 1p
   padding: var(--space-sm);
 }
 .chart-container-square canvas { width: 100% !important; height: 100% !important; }
+
+/* Treemap "de cuadriláteros" con la distribución de entrenos por tipo:
+   cada rectángulo ocupa un área proporcional a su duración total, con un
+   hueco de 2px (el fondo de la tarjeta) entre piezas y color fijo por tipo
+   (nunca por índice/orden, para que un mismo tipo se vea siempre igual). */
+.treemap {
+  position: relative;
+  flex: 1;
+  margin-top: var(--space-xs);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.treemap-cell {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--bg-surface);
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px;
+  text-align: center;
+  overflow: hidden;
+  cursor: default;
+}
+.treemap-cell-label {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.1;
+  color: var(--bg-main);
+}
+.treemap-cell-value {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 10px;
+  color: var(--bg-main);
+  opacity: 0.85;
+}
+
+/* Contenedor ancho (no cuadrado) para el calendario de entrenos. */
+.chart-container-wide {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  padding: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+/* Calendario "estilo GitHub": una columna por semana, una fila por día de
+   la semana (lunes arriba), coloreado por minutos entrenados ese día. */
+.training-calendar-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.training-calendar {
+  position: relative;
+  display: grid;
+  grid-template-rows: 14px repeat(7, 12px);
+  grid-auto-columns: 12px;
+  gap: 3px;
+  width: max-content;
+}
+.training-calendar-month-label {
+  grid-row: 1;
+  align-self: start;
+  font-family: var(--font-body);
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.training-calendar-day {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--bg-surface-elevated);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.training-calendar-day:hover { transform: scale(1.25); }
+.training-calendar-day.nivel-0 { background: var(--bg-surface-elevated); cursor: default; }
+.training-calendar-day.nivel-0:hover { transform: none; }
+.training-calendar-day.nivel-1 { background: #173257; }
+.training-calendar-day.nivel-2 { background: #1f4f8c; }
+.training-calendar-day.nivel-3 { background: var(--accent-blue); }
+.training-calendar-day.nivel-4 { background: var(--accent-blue-glow); }
+
+.training-calendar-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--space-xs);
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.training-calendar-legend .training-calendar-day { cursor: default; }
+.training-calendar-legend .training-calendar-day:hover { transform: none; }
 
 .chart-container canvas {
   /* Chart.js necesita que su contenedor tenga una altura fija en CSS;
